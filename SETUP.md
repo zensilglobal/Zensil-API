@@ -76,6 +76,14 @@ no rebuild needed. Put a reverse proxy (Caddy/nginx/Traefik) in front for TLS.
 
 To update: `git pull && docker compose up --build -d web`.
 
+### Or: managed hosting on Render
+`render.yaml` at the repo root is a [Render Blueprint](https://render.com/docs/blueprint-spec)
+that builds the same Dockerfile. In the Render dashboard: **New → Blueprint →
+select this repo**, then enter `APP_AUTH_PASSWORD` and `DATABASE_URL` (Neon
+pooled string) when prompted — `APP_AUTH_SECRET` is auto-generated. Every push
+to `main` redeploys. The free plan sleeps after idle; use `starter` for always-on.
+The ETL is unaffected — it keeps running on the GitHub Actions schedule.
+
 ## 7. Connect Claude (MCP)
 Point a Postgres MCP server at the `zensil_readonly` role and add it as a custom
 connector in a "Zensil Ops" Claude Project whose instructions hold the schema,

@@ -10,6 +10,7 @@ etl
 supabase
 prototype
 docker-compose.yml
+render.yaml
 SETUP.md
 README.md
 Dockerfile
