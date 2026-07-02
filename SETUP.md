@@ -56,9 +56,16 @@ the secrets above; failures alert via the webhook/email. `ci.yml` lints, type-ch
 and builds the web app + lints the ETL on every PR.
 
 ## 6. Deploy the dashboard (Vercel)
-- Import the repo; set **Root Directory = `apps/web`**.
-- Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `ANTHROPIC_API_KEY`.
-- Deploy. Vercel gives preview URLs per PR.
+This is a monorepo — the Next.js app lives in `apps/web`, so Vercel **must** be
+pointed at that folder or you get *"Could not identify Next.js version"*.
+
+1. Import the repo in Vercel.
+2. **Settings → Build & Deployment → Root Directory → set to `apps/web`** (do **not** leave it at the repository root). Vercel then auto-detects Next.js — no `vercel.json` needed.
+3. **Settings → Environment Variables** — add:
+   - `DATABASE_URL` — your Neon connection string (dashboard reads it server-side)
+   - `APP_AUTH_EMAIL`, `APP_AUTH_PASSWORD`, `APP_AUTH_SECRET` — login
+   - `ANTHROPIC_API_KEY` — optional (real Claude answers)
+4. Redeploy. Preview URLs per PR.
 
 ## 7. Connect Claude (MCP)
 Point a Postgres MCP server at the `zensil_readonly` role and add it as a custom
