@@ -1,0 +1,16 @@
+# web image build context (repo root) — exclude everything not needed by Next
+node_modules
+.next
+.git
+.github
+.env
+.env.local
+*.env
+etl
+supabase
+prototype
+docker-compose.yml
+SETUP.md
+README.md
+Dockerfile
+.dockerignore

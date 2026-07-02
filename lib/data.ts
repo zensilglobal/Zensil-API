@@ -19,11 +19,10 @@ import { inr, inrK, num, pct, deltaPct, channelName } from "./format";
 
 /* =====================================================================
    DATA LAYER
-   Currently computes from a deterministic in-memory sample warehouse so
-   the dashboard is fully functional with zero credentials. The PRODUCTION
-   seam: when NEXT_PUBLIC_SUPABASE_URL is set, each query function should
-   call the matching Supabase RPC (api_kpi_overview, api_stock_health, …)
-   defined in supabase/migrations. Shapes returned here match those RPCs.
+   Computes from a deterministic in-memory sample warehouse so the
+   dashboard is fully functional with zero credentials. lib/queries.ts is
+   the seam: when DATABASE_URL is set it routes to the live Neon queries
+   in lib/warehouse.ts instead; the shapes returned here match those.
    ===================================================================== */
 
 const BASE = new Date("2026-06-29T00:00:00Z");

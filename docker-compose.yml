@@ -5,12 +5,15 @@
 services:
   web:
     build:
-      context: ./apps/web
+      context: .
+      dockerfile: Dockerfile
     image: zensil-web
     ports:
       - "3000:3000"
     env_file:
-      - ./apps/web/.env.local
+      # optional: without it the dashboard runs on built-in sample data
+      - path: ./.env.local
+        required: false
     restart: unless-stopped
 
   etl:
