@@ -41,7 +41,7 @@ def fetch() -> tuple[list[dict], list[dict], list[dict]]:
     can take minutes; keeping a warehouse connection open idle would drop it)."""
     headers = amazon_spapi.auth_headers()
     base = amazon_spapi.api_base()
-    created_after = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=LOOKBACK_DAYS)).strftime(
+    created_after = (dt.datetime.now(dt.UTC) - dt.timedelta(days=LOOKBACK_DAYS)).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
 
@@ -73,7 +73,8 @@ def fetch() -> tuple[list[dict], list[dict], list[dict]]:
             })
 
             # line items (separate rate-limited call per order)
-            items = _get(client, f"/orders/v0/orders/{oid}/orderItems", headers).get("payload", {}).get("OrderItems", [])
+            items_payload = _get(client, f"/orders/v0/orders/{oid}/orderItems", headers).get("payload", {})
+            items = items_payload.get("OrderItems", [])
             for i, li in enumerate(items, start=1):
                 sku = li.get("SellerSKU") or li.get("ASIN") or f"UNKNOWN-{oid}-{i}"
                 qty = int(li.get("QuantityOrdered", 0) or 0)

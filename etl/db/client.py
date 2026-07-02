@@ -1,8 +1,9 @@
 """Postgres connection + a generic idempotent upsert helper (PRD §9)."""
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from contextlib import contextmanager
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 import psycopg
 
