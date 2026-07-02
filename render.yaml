@@ -11,6 +11,12 @@ services:
     healthCheckPath: /login # returns 200 without a session (/ redirects to it)
     autoDeploy: true # redeploy on every push to main
     envVars:
+      # standalone server.js binds to $HOSTNAME; without this the container's
+      # own hostname wins and Render's proxy can't reach the app (502)
+      - key: HOSTNAME
+        value: 0.0.0.0
+      - key: PORT
+        value: "3000"
       - key: APP_AUTH_EMAIL
         value: office@zensil.in
       - key: APP_AUTH_PASSWORD
