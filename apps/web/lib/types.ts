@@ -1,0 +1,101 @@
+export type Channel = "amazon" | "flipkart" | "shopify";
+export type ChannelFilter = "all" | Channel;
+export type RangeDays = 7 | 30 | 90;
+
+export interface Filter {
+  channel: ChannelFilter;
+  days: RangeDays;
+}
+
+export interface Kpi {
+  label: string;
+  value: string;
+  deltaPct?: number | null;
+  sub?: string;
+  splitHtml?: string;
+}
+
+export interface TrendPoint {
+  label: string;
+  amazon: number;
+  flipkart: number;
+  shopify: number;
+}
+
+export interface OrderRow {
+  id: string;
+  channel: Channel;
+  date: string; // ISO
+  sku: string;
+  name: string;
+  qty: number;
+  value: number;
+  region: string;
+  status: "delivered" | "transit" | "pending" | "returned";
+}
+
+export interface StockRow {
+  sku: string;
+  name: string;
+  stock: number;
+  velocity: number;
+  cover: number;
+  status: "critical" | "low" | "healthy";
+}
+
+export interface CampaignRow {
+  name: string;
+  spend: number;
+  sales: number;
+  acos: number;
+  clicks: number;
+  orders: number;
+}
+
+export interface WastedRow {
+  term: string;
+  spend: number;
+  clicks: number;
+  orders: number;
+}
+
+export interface ReturnRow {
+  sku: string;
+  name: string;
+  rate: number;
+  reason: string;
+  units: number;
+}
+
+export interface ReturnReason {
+  reason: string;
+  share: number;
+  color: string;
+}
+
+export interface ProductRow {
+  sku: string;
+  name: string;
+  amazonVel: number;
+  flipkartVel: number;
+  shopifyVel: number;
+  marginPct: number;
+  totalStock: number;
+  bestChannel: Channel;
+}
+
+export interface Decision {
+  icon: string;
+  title: string;
+  body: string;
+  severity: "high" | "med" | "low";
+  severityLabel: string;
+  channel?: Channel;
+  ask: string;
+}
+
+export interface ChannelSplit {
+  amazon: number;
+  flipkart: number;
+  shopify: number;
+}

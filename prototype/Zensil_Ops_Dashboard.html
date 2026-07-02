@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zensil Ops — Multichannel Data &amp; Decision Platform</title>
+<meta name="description" content="Zensil unified operations dashboard — Amazon &amp; Flipkart KPIs, inventory, advertising, returns and Claude-powered decisions." />
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<!-- Charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+/* ============================================================
+   ZENSIL OPS — Ultra-luxury operations console
+   Palette: Crimson #c22222 · Obsidian black · Imperial gold · Emerald
+   ============================================================ */
+:root{
+  --crimson:#c22222;
+  --crimson-bright:#e23b3b;
+  --crimson-deep:#7e1414;
+  --gold:#d4af37;
+  --gold-soft:#e8cf86;
+  --gold-deep:#9a7b1e;
+  --green:#2ecc71;
+  --green-deep:#1f7a4d;
+  --green-soft:#7fe0a8;
+
+  --ink-000:#070708;
+  --ink-050:#0c0c0e;
+  --ink-100:#111114;
+  --ink-150:#16161b;
+  --ink-200:#1c1c23;
+  --ink-300:#26262f;
+  --line:rgba(212,175,55,.16);
+  --line-strong:rgba(212,175,55,.32);
+
+  --text:#f3efe6;
+  --text-dim:#a9a39a;
+  --text-faint:#6f6a62;
+
+  /* channel coding */
+  --amazon:#d4af37;     /* gold/amber */
+  --flipkart:#3f8fe0;   /* sapphire blue */
+
+  --radius:16px;
+  --radius-sm:11px;
+  --shadow:0 24px 60px -28px rgba(0,0,0,.85), 0 2px 0 rgba(212,175,55,.04) inset;
+  --serif:'Cormorant Garamond',Georgia,serif;
+  --sans:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--sans);
+  color:var(--text);
+  background:
+    radial-gradient(1200px 700px at 78% -10%, rgba(194,34,34,.10), transparent 60%),
+    radial-gradient(900px 600px at 8% 110%, rgba(212,175,55,.07), transparent 55%),
+    linear-gradient(180deg,#08080a,#050506);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased;
+  letter-spacing:.1px;
+  min-height:100vh;
+}
+::selection{background:rgba(212,175,55,.28);color:#fff}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:linear-gradient(var(--gold-deep),var(--crimson-deep));border-radius:20px;border:3px solid transparent;background-clip:padding-box}
+
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+
+/* ===================== LAYOUT SHELL ===================== */
+.app{display:grid;grid-template-columns:264px 1fr;min-height:100vh}
+
+/* ---- Sidebar ---- */
+.sidebar{
+  position:sticky;top:0;height:100vh;
+  background:linear-gradient(180deg,rgba(12,12,14,.96),rgba(8,8,10,.99));
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;
+  backdrop-filter:blur(8px);
+  z-index:30;
+}
+.brand{
+  padding:26px 24px 22px;
+  border-bottom:1px solid var(--line);
+}
+.brand .crest{
+  display:flex;align-items:center;gap:13px;
+}
+.crest .mark{
+  width:42px;height:42px;border-radius:11px;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,.22), transparent 45%),
+    linear-gradient(140deg,var(--crimson),var(--crimson-deep));
+  border:1px solid var(--line-strong);
+  display:grid;place-items:center;
+  font-family:var(--serif);font-weight:700;font-size:23px;color:var(--gold-soft);
+  box-shadow:0 10px 26px -12px rgba(194,34,34,.7), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.crest .word{line-height:1.05}
+.crest .word b{
+  font-family:var(--serif);font-weight:700;font-size:23px;letter-spacing:.6px;
+  background:linear-gradient(92deg,#fff,var(--gold-soft) 70%,var(--gold));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.crest .word span{
+  display:block;font-size:9.5px;letter-spacing:3.4px;text-transform:uppercase;
+  color:var(--text-faint);margin-top:3px;font-weight:600;
+}
+
+.nav{padding:16px 14px;flex:1;overflow-y:auto}
+.nav-label{
+  font-size:9.5px;letter-spacing:2.6px;text-transform:uppercase;
+  color:var(--text-faint);font-weight:700;margin:10px 12px 9px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:12px;
+  padding:10.5px 13px;border-radius:11px;margin-bottom:3px;
+  color:var(--text-dim);font-size:13.7px;font-weight:500;
+  position:relative;transition:.18s;
+}
+.nav-item svg{width:18px;height:18px;flex:none;stroke-width:1.7}
+.nav-item .badge{
+  margin-left:auto;font-size:10px;font-weight:700;
+  background:var(--crimson);color:#fff;border-radius:20px;
+  min-width:19px;height:19px;padding:0 6px;display:grid;place-items:center;
+  box-shadow:0 0 0 1px rgba(255,255,255,.08);
+}
+.nav-item:hover{color:var(--text);background:rgba(212,175,55,.05)}
+.nav-item.active{
+  color:#fff;
+  background:linear-gradient(90deg,rgba(194,34,34,.20),rgba(212,175,55,.05));
+  box-shadow:inset 0 0 0 1px var(--line);
+}
+.nav-item.active::before{
+  content:"";position:absolute;left:-14px;top:50%;transform:translateY(-50%);
+  width:4px;height:24px;border-radius:0 4px 4px 0;
+  background:linear-gradient(var(--gold),var(--crimson));
+}
+.sidebar-foot{
+  padding:15px 18px;border-top:1px solid var(--line);
+  font-size:11px;color:var(--text-faint);
+}
+.sync-pill{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text-dim);margin-bottom:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(46,204,113,.18);animation:pulse 2.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* ---- Main ---- */
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{
+  position:sticky;top:0;z-index:20;
+  display:flex;align-items:center;gap:18px;
+  padding:18px 34px;
+  background:linear-gradient(180deg,rgba(8,8,10,.92),rgba(8,8,10,.55));
+  border-bottom:1px solid var(--line);
+  backdrop-filter:blur(14px);
+}
+.page-title h1{
+  font-family:var(--serif);font-weight:700;font-size:27px;letter-spacing:.3px;line-height:1;
+}
+.page-title p{font-size:12.5px;color:var(--text-dim);margin-top:5px}
+.topbar .spacer{flex:1}
+
+/* segmented channel filter */
+.seg{
+  display:flex;background:var(--ink-150);border:1px solid var(--line);
+  border-radius:12px;padding:4px;gap:3px;
+}
+.seg button{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 15px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--text-dim);
+  transition:.16s;white-space:nowrap;
+}
+.seg button .swatch{width:9px;height:9px;border-radius:50%}
+.seg button:hover{color:var(--text)}
+.seg button.on{color:#0a0a0a;background:linear-gradient(180deg,var(--gold-soft),var(--gold));box-shadow:0 6px 16px -8px rgba(212,175,55,.7)}
+
+.range{display:flex;background:var(--ink-150);border:1px solid var(--line);border-radius:12px;padding:4px;gap:3px}
+.range button{padding:7px 13px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--text-dim)}
+.range button.on{color:#fff;background:rgba(194,34,34,.85);box-shadow:0 6px 16px -8px rgba(194,34,34,.8)}
+.range button:hover{color:var(--text)}
+
+.content{padding:30px 34px 60px;flex:1}
+
+/* ===================== UI PRIMITIVES ===================== */
+.card{
+  background:linear-gradient(180deg,rgba(22,22,27,.92),rgba(14,14,17,.92));
+  border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);position:relative;overflow:hidden;
+}
+.card::after{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,var(--line-strong),transparent)}
+.card-h{display:flex;align-items:center;gap:12px;padding:18px 20px 0}
+.card-h h3{font-size:14px;font-weight:600;letter-spacing:.3px}
+.card-h .sub{font-size:11.5px;color:var(--text-faint);margin-top:2px}
+.card-h .spacer{flex:1}
+.card-b{padding:18px 20px 20px}
+
+.grid{display:grid;gap:18px}
+.g-4{grid-template-columns:repeat(4,1fr)}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.g-2{grid-template-columns:repeat(2,1fr)}
+.span-2{grid-column:span 2}
+
+/* KPI tile */
+.kpi{
+  padding:20px;border-radius:var(--radius);position:relative;overflow:hidden;
+  background:linear-gradient(165deg,rgba(26,26,32,.95),rgba(12,12,15,.97));
+  border:1px solid var(--line);box-shadow:var(--shadow);
+}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(var(--gold),var(--crimson))}
+.kpi .lab{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-faint);font-weight:700}
+.kpi .val{font-family:var(--serif);font-weight:700;font-size:33px;margin-top:9px;line-height:1;letter-spacing:.3px}
+.kpi .val small{font-size:18px;color:var(--text-dim);font-family:var(--sans);font-weight:600}
+.kpi .meta{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;flex-wrap:wrap}
+.delta{display:inline-flex;align-items:center;gap:4px;font-weight:700;padding:3px 8px;border-radius:20px;font-size:11.5px}
+.delta.up{color:var(--green-soft);background:rgba(46,204,113,.12)}
+.delta.down{color:#ff9b9b;background:rgba(194,34,34,.14)}
+.split-mini{font-size:11px;color:var(--text-faint)}
+.split-mini b{color:var(--text-dim)}
+
+/* channel chips */
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;border:1px solid var(--line)}
+.chip .swatch{width:8px;height:8px;border-radius:50%}
+.chip.amazon{color:var(--amazon)} .chip.amazon .swatch{background:var(--amazon)}
+.chip.flipkart{color:var(--flipkart)} .chip.flipkart .swatch{background:var(--flipkart)}
+
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{
+  text-align:left;font-size:10.5px;letter-spacing:1.3px;text-transform:uppercase;
+  color:var(--text-faint);font-weight:700;padding:0 14px 11px;border-bottom:1px solid var(--line);
+}
+tbody td{padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text-dim)}
+tbody tr:hover td{background:rgba(212,175,55,.035);color:var(--text)}
+tbody tr:last-child td{border-bottom:none}
+td .strong{color:var(--text);font-weight:600}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.right{text-align:right}
+
+/* status pills */
+.pill{font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:4px 10px;border-radius:20px;display:inline-block;text-transform:uppercase}
+.pill.critical{color:#ffb4b4;background:rgba(194,34,34,.18);box-shadow:inset 0 0 0 1px rgba(194,34,34,.35)}
+.pill.low{color:var(--gold-soft);background:rgba(212,175,55,.13);box-shadow:inset 0 0 0 1px rgba(212,175,55,.3)}
+.pill.healthy{color:var(--green-soft);background:rgba(46,204,113,.12);box-shadow:inset 0 0 0 1px rgba(46,204,113,.28)}
+.pill.delivered{color:var(--green-soft);background:rgba(46,204,113,.1)}
+.pill.transit{color:var(--gold-soft);background:rgba(212,175,55,.1)}
+.pill.pending{color:var(--text-dim);background:rgba(255,255,255,.05)}
+.pill.returned{color:#ffb4b4;background:rgba(194,34,34,.13)}
+
+/* bars in cells */
+.bar{height:7px;border-radius:6px;background:rgba(255,255,255,.06);overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;border-radius:6px}
+
+/* decision panel */
+.decision{
+  display:flex;gap:14px;padding:15px;border-radius:13px;margin-bottom:11px;
+  background:linear-gradient(100deg,rgba(194,34,34,.07),rgba(212,175,55,.025));
+  border:1px solid var(--line);transition:.16s;
+}
+.decision:hover{border-color:var(--line-strong);transform:translateX(2px)}
+.decision .ic{
+  width:40px;height:40px;border-radius:11px;flex:none;display:grid;place-items:center;
+  background:rgba(0,0,0,.3);border:1px solid var(--line);
+}
+.decision .ic svg{width:20px;height:20px}
+.decision h4{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+.decision p{font-size:12px;color:var(--text-dim);margin-top:4px;line-height:1.5}
+.decision .act{margin-top:9px}
+.sev{font-size:9.5px;font-weight:800;letter-spacing:.6px;padding:2px 7px;border-radius:5px;text-transform:uppercase}
+.sev.high{background:var(--crimson);color:#fff}
+.sev.med{background:var(--gold-deep);color:#1a1305}
+.sev.low{background:rgba(255,255,255,.1);color:var(--text-dim)}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:12px;font-weight:600;padding:8px 14px;border-radius:9px;transition:.16s;
+}
+.btn.gold{background:linear-gradient(180deg,var(--gold-soft),var(--gold));color:#1a1305;box-shadow:0 8px 18px -10px rgba(212,175,55,.8)}
+.btn.gold:hover{filter:brightness(1.07);transform:translateY(-1px)}
+.btn.ghost{border:1px solid var(--line-strong);color:var(--text-dim)}
+.btn.ghost:hover{color:#fff;border-color:var(--gold);background:rgba(212,175,55,.06)}
+.btn svg{width:15px;height:15px}
+
+.chart-wrap{position:relative;height:260px}
+.chart-wrap.sm{height:210px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--text-dim)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:11px;height:11px;border-radius:3px}
+
+/* section header */
+.section-head{display:flex;align-items:flex-end;gap:14px;margin:4px 0 18px}
+.section-head h2{font-family:var(--serif);font-weight:700;font-size:22px}
+.section-head p{font-size:12.5px;color:var(--text-dim)}
+.section-head .spacer{flex:1}
+
+/* page transitions */
+.page{display:none;animation:rise .45s cubic-bezier(.2,.8,.2,1)}
+.page.active{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* Claude insights */
+.ask{
+  display:flex;gap:12px;align-items:center;padding:8px 8px 8px 18px;border-radius:14px;
+  background:linear-gradient(100deg,rgba(212,175,55,.06),rgba(194,34,34,.04));
+  border:1px solid var(--line-strong);
+}
+.ask input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:14.5px;font-family:var(--sans);padding:10px 0}
+.ask input::placeholder{color:var(--text-faint)}
+.suggested{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.suggested button{
+  font-size:12px;color:var(--text-dim);padding:8px 13px;border-radius:20px;
+  border:1px solid var(--line);background:rgba(255,255,255,.02);transition:.16s;
+}
+.suggested button:hover{color:#fff;border-color:var(--gold);background:rgba(212,175,55,.06)}
+.insight-card{
+  padding:17px;border-radius:13px;border:1px solid var(--line);
+  background:linear-gradient(165deg,rgba(24,24,30,.9),rgba(12,12,15,.92));
+}
+.insight-card .tag{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.insight-card h4{font-size:14.5px;margin-top:8px;font-weight:600}
+.insight-card p{font-size:12.5px;color:var(--text-dim);margin-top:7px;line-height:1.55}
+.insight-card .ev{font-family:var(--mono);font-size:11.5px;color:var(--gold-soft);margin-top:10px;padding:9px 11px;background:rgba(0,0,0,.35);border-radius:8px;border:1px solid var(--line)}
+
+.chat-thread{display:flex;flex-direction:column;gap:14px;margin-top:18px}
+.bubble{max-width:88%;padding:14px 16px;border-radius:14px;font-size:13.5px;line-height:1.6}
+.bubble.you{align-self:flex-end;background:rgba(194,34,34,.16);border:1px solid rgba(194,34,34,.3)}
+.bubble.claude{align-self:flex-start;background:rgba(22,22,28,.9);border:1px solid var(--line)}
+.bubble.claude .who{font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:7px;display:flex;align-items:center;gap:7px}
+.bubble .sql{font-family:var(--mono);font-size:11.5px;color:var(--gold-soft);background:rgba(0,0,0,.4);border-radius:8px;padding:10px;margin:10px 0;border:1px solid var(--line);white-space:pre-wrap;overflow-x:auto}
+.bubble code{font-family:var(--mono);font-size:11.5px;color:var(--gold-soft);background:rgba(212,175,55,.08);padding:1px 5px;border-radius:5px}
+.bubble ul{margin-top:4px}.bubble li{margin:4px 0;color:var(--text-dim)}
+.bubble table td{padding:7px 10px;border-color:rgba(255,255,255,.05)}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block;margin:0 1px;animation:blink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+
+.empty{text-align:center;color:var(--text-faint);font-size:13px;padding:40px}
+
+/* mini util */
+.muted{color:var(--text-faint)}
+.tiny{font-size:11px}
+.flex{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+.mt{margin-top:18px}
+
+/* mobile */
+.menu-btn{display:none}
+@media(max-width:1100px){.g-4{grid-template-columns:repeat(2,1fr)}.g-3{grid-template-columns:1fr 1fr}}
+@media(max-width:880px){
+  .app{grid-template-columns:1fr}
+  .sidebar{position:fixed;left:0;top:0;width:264px;transform:translateX(-100%);transition:.3s}
+  .sidebar.open{transform:none}
+  .menu-btn{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--ink-150)}
+  .topbar{flex-wrap:wrap;padding:14px 18px}
+  .content{padding:20px 16px 50px}
+  .g-4,.g-3,.g-2{grid-template-columns:1fr}.span-2{grid-column:auto}
+  .page-title h1{font-size:22px}
+  .scrim.show{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:25}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="crest">
+        <div class="mark">Z</div>
+        <div class="word"><b>ZENSIL</b><span>Ops Console</span></div>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-label">Command</div>
+      <a class="nav-item active" data-page="overview">${ico('grid')}<span>Overview</span></a>
+      <a class="nav-item" data-page="sales">${ico('cart')}<span>Sales &amp; Orders</span></a>
+      <a class="nav-item" data-page="inventory">${ico('box')}<span>Inventory</span><span class="badge" id="bx-inv">2</span></a>
+      <a class="nav-item" data-page="advertising">${ico('target')}<span>Advertising</span><span class="badge" id="bx-ad">1</span></a>
+      <a class="nav-item" data-page="returns">${ico('rotate')}<span>Returns</span></a>
+      <a class="nav-item" data-page="products">${ico('layers')}<span>Products</span></a>
+      <div class="nav-label" style="margin-top:18px">Intelligence</div>
+      <a class="nav-item" data-page="claude">${ico('spark')}<span>Claude Insights</span><span class="badge" id="bx-cl">3</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="sync-pill"><span class="dot"></span> Warehouse synced · <span id="sync-ago">just now</span></div>
+      <div class="tiny muted">Amazon.in · Flipkart · INR · IST</div>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">${ico('grid')}</button>
+      <div class="page-title">
+        <h1 id="pgTitle">Overview</h1>
+        <p id="pgSub">Headline performance across both marketplaces</p>
+      </div>
+      <div class="spacer"></div>
+
+      <div class="seg" id="channelSeg">
+        <button data-ch="all" class="on">All</button>
+        <button data-ch="amazon"><span class="swatch" style="background:var(--amazon)"></span>Amazon</button>
+        <button data-ch="flipkart"><span class="swatch" style="background:var(--flipkart)"></span>Flipkart</button>
+      </div>
+      <div class="range" id="rangeSeg">
+        <button data-d="7">7D</button>
+        <button data-d="30" class="on">30D</button>
+        <button data-d="90">90D</button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ===== OVERVIEW ===== -->
+      <section class="page active" id="page-overview">
+        <div class="grid g-4" id="ov-kpis"></div>
+
+        <div class="grid g-3 mt">
+          <div class="card span-2">
+            <div class="card-h"><div><h3>Revenue Trend</h3><div class="sub">Daily net revenue by channel (INR)</div></div><div class="spacer"></div><span class="chip amazon"><span class="swatch"></span>Amazon</span><span class="chip flipkart"><span class="swatch"></span>Flipkart</span></div>
+            <div class="card-b"><div class="chart-wrap"><canvas id="ov-trend"></canvas></div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div><h3>Channel Split</h3><div class="sub">Revenue contribution</div></div></div>
+            <div class="card-b"><div class="chart-wrap sm"><canvas id="ov-donut"></canvas></div>
+              <div class="legend" id="ov-donut-leg"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid g-3 mt">
+          <div class="card span-2">
+            <div class="card-h">
+              <div><h3>Decisions Waiting On You</h3><div class="sub">Surfaced by the pipeline · approve &amp; execute manually</div></div>
+              <div class="spacer"></div>
+              <button class="btn ghost" onclick="go('claude')">${ico('spark')} Ask Claude why</button>
+            </div>
+            <div class="card-b" id="ov-decisions"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div><h3>Top Products</h3><div class="sub">By revenue, period</div></div></div>
+            <div class="card-b" id="ov-top"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== SALES & ORDERS ===== -->
+      <section class="page" id="page-sales">
+        <div class="grid g-4" id="sl-kpis"></div>
+        <div class="card mt">
+          <div class="card-h"><div><h3>Orders Per Day</h3><div class="sub">Order count by channel</div></div></div>
+          <div class="card-b"><div class="chart-wrap"><canvas id="sl-orders"></canvas></div></div>
+        </div>
+        <div class="card mt">
+          <div class="card-h"><div><h3>Recent Orders</h3><div class="sub">Latest marketplace orders &amp; fulfilment status</div></div><div class="spacer"></div><span class="tiny muted" id="sl-count"></span></div>
+          <div class="card-b" style="padding-top:6px;overflow-x:auto"><table id="sl-table"></table></div>
+        </div>
+      </section>
+
+      <!-- ===== INVENTORY ===== -->
+      <section class="page" id="page-inventory">
+        <div class="grid g-4" id="inv-kpis"></div>
+        <div class="card mt">
+          <div class="card-h">
+            <div><h3>Stock Health</h3><div class="sub">Days-of-cover at trailing-14-day velocity · sorted by urgency</div></div>
+            <div class="spacer"></div>
+            <button class="btn gold" onclick="askClaude('Plan a restock for all SKUs with fewer than 14 days of cover before the next sale event')">${ico('spark')} Ask Claude to plan a restock</button>
+          </div>
+          <div class="card-b" style="padding-top:6px;overflow-x:auto"><table id="inv-table"></table></div>
+        </div>
+      </section>
+
+      <!-- ===== ADVERTISING ===== -->
+      <section class="page" id="page-advertising">
+        <div class="card" id="ad-amazon-note" style="display:none;margin-bottom:18px">
+          <div class="card-b flex" style="gap:13px">
+            <div class="ic" style="width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:rgba(212,175,55,.1);border:1px solid var(--line)">${ico('info','var(--gold)')}</div>
+            <div><div class="strong">Amazon-only capability</div><div class="tiny muted" style="margin-top:3px">Flipkart exposes no seller-facing advertising API. Ad analysis is Amazon-only in v1. Showing Amazon advertising data.</div></div>
+          </div>
+        </div>
+        <div class="grid g-4" id="ad-kpis"></div>
+        <div class="grid g-2 mt">
+          <div class="card">
+            <div class="card-h"><div><h3>Campaign Performance</h3><div class="sub">Colour-coded by ACOS vs target (28%)</div></div></div>
+            <div class="card-b" style="padding-top:6px;overflow-x:auto"><table id="ad-camp"></table></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div><h3>Wasted Spend — Search Terms</h3><div class="sub">Over ₹500 spend, zero / near-zero orders</div></div><div class="spacer"></div><button class="btn ghost" onclick="askClaude('Which search terms should I add as negative keywords this week and how much spend will it save?')">${ico('spark')} Harvest negatives</button></div>
+            <div class="card-b" style="padding-top:6px;overflow-x:auto"><table id="ad-waste"></table></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== RETURNS ===== -->
+      <section class="page" id="page-returns">
+        <div class="grid g-4" id="rt-kpis"></div>
+        <div class="grid g-3 mt">
+          <div class="card">
+            <div class="card-h"><div><h3>Return Reasons</h3><div class="sub">Share of returns</div></div></div>
+            <div class="card-b"><div class="chart-wrap sm"><canvas id="rt-reasons"></canvas></div><div class="legend" id="rt-leg"></div></div>
+          </div>
+          <div class="card span-2">
+            <div class="card-h"><div><h3>Highest Return-Rate Products</h3><div class="sub">Ranked by return rate · top reason shown</div></div></div>
+            <div class="card-b" style="padding-top:6px;overflow-x:auto"><table id="rt-table"></table></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PRODUCTS ===== -->
+      <section class="page" id="page-products">
+        <div class="section-head"><h2>Cross-Channel SKU Master</h2><p>Amazon vs Flipkart velocity, contribution margin &amp; stock — one row per product</p></div>
+        <div class="card">
+          <div class="card-b" style="overflow-x:auto"><table id="pr-table"></table></div>
+        </div>
+      </section>
+
+      <!-- ===== CLAUDE INSIGHTS ===== -->
+      <section class="page" id="page-claude">
+        <div class="card">
+          <div class="card-b">
+            <div class="ask">
+              ${ico('spark','var(--gold)')}
+              <input id="askInput" placeholder="Ask anything about your warehouse — e.g. which SKU has the worst margin on Flipkart?" />
+              <button class="btn gold" id="askBtn">${ico('send')} Ask</button>
+            </div>
+            <div class="suggested" id="suggested"></div>
+          </div>
+        </div>
+        <div class="grid g-3 mt" id="cl-cards"></div>
+        <div id="cl-thread" class="chat-thread"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+/* ===== inline icon helper (string, used in template above via function hoisting) ===== */
+function ico(name,stroke){
+  stroke=stroke||'currentColor';
+  const p={
+    grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    cart:'<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2.5 3h2l2.2 12.4a1.5 1.5 0 0 0 1.5 1.2h8.5a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/>',
+    box:'<path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/>',
+    target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/>',
+    rotate:'<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>',
+    layers:'<path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/>',
+    spark:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M18 18l-2.5-2.5M18 6l-2.5 2.5M6 18l2.5-2.5"/><circle cx="12" cy="12" r="3"/>',
+    send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/>',
+    info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.8 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/>',
+    coin:'<circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.5h4a1.5 1.5 0 0 1 0 3H10a1.5 1.5 0 0 0 0 3h4"/>',
+    check:'<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/>'
+  }[name]||'';
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="'+stroke+'" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';
+}
+</script>
+
+<!-- NOTE: the markup above references ico() inside template literals; we render dynamic icons in JS.
+     For static markup we inject icons after load: -->
+<script>
+/* =====================================================================
+   DATA LAYER — representative sample warehouse (replace with read-only API)
+   ===================================================================== */
+const fmt = {
+  inr:(n)=>'₹'+Math.round(n).toLocaleString('en-IN'),
+  inrK:(n)=>{n=Math.round(n); if(n>=10000000)return '₹'+(n/10000000).toFixed(2)+'Cr'; if(n>=100000)return '₹'+(n/100000).toFixed(2)+'L'; if(n>=1000)return '₹'+(n/1000).toFixed(1)+'K'; return '₹'+n;},
+  n:(n)=>Math.round(n).toLocaleString('en-IN'),
+  pc:(n)=>n.toFixed(1)+'%'
+};
+
+// deterministic pseudo-random for stable demo data
+let _seed=42; const rnd=()=>{_seed=(_seed*1103515245+12345)&0x7fffffff;return _seed/0x7fffffff;};
+
+const products = [
+  {sku:'ZN-AROMA-01', name:'Zensil Amber Oud Diffuser', cost:540, margin:42, az_vel:11.4, fk_vel:6.2, az_stock:120, fk_stock:64, az_price:1499, fk_price:1399},
+  {sku:'ZN-SILK-22',  name:'Imperial Silk Scarf — Crimson', cost:820, margin:38, az_vel:7.8, fk_vel:9.1, az_stock:34, fk_stock:18, az_price:2299, fk_price:2149},
+  {sku:'ZN-CANDLE-07',name:'Gilded Soy Candle Trio', cost:310, margin:51, az_vel:14.2, fk_vel:5.4, az_stock:9, fk_stock:41, az_price:899, fk_price:849},
+  {sku:'ZN-TEA-15',   name:'Royal Assam Gold Tin', cost:260, margin:46, az_vel:9.6, fk_vel:12.8, az_stock:210, fk_stock:88, az_price:749, fk_price:699},
+  {sku:'ZN-LEATHER-09',name:'Obsidian Leather Journal', cost:430, margin:44, az_vel:5.1, fk_vel:3.2, az_stock:6, fk_stock:12, az_price:1199, fk_price:1149},
+  {sku:'ZN-BRASS-31', name:'Heritage Brass Incense Stand', cost:380, margin:40, az_vel:4.4, fk_vel:7.7, az_stock:58, fk_stock:5, az_price:999, fk_price:949},
+  {sku:'ZN-GLOW-44',  name:'24K Glow Face Serum', cost:290, margin:58, az_vel:18.9, fk_vel:8.3, az_stock:74, fk_stock:140, az_price:1099, fk_price:999},
+  {sku:'ZN-VELVET-12',name:'Velvet Cushion — Emerald', cost:610, margin:36, az_vel:3.6, fk_vel:6.9, az_stock:90, fk_stock:31, az_price:1799, fk_price:1699}
+];
+
+const campaigns = [
+  {name:'SP — Amber Oud Exact', spend:18400, sales:71200, acos:25.8, clicks:2140, orders:62},
+  {name:'SP — Gold Serum Auto', spend:22600, sales:54300, acos:41.6, clicks:3010, orders:48},
+  {name:'SB — Brand Defense', spend:9800, sales:48900, acos:20.0, clicks:1180, orders:39},
+  {name:'SP — Candle Trio Broad', spend:14300, sales:24100, acos:59.3, clicks:2620, orders:19},
+  {name:'SD — Retargeting', spend:7600, sales:31200, acos:24.4, clicks:940, orders:27},
+  {name:'SP — Silk Scarf Phrase', spend:11200, sales:39800, acos:28.1, clicks:1490, orders:31}
+];
+
+const wasted = [
+  {term:'cheap diffuser online', spend:2840, clicks:412, orders:0},
+  {term:'candle gift set under 500', spend:1960, clicks:301, orders:0},
+  {term:'serum for oily skin', spend:1610, clicks:248, orders:1},
+  {term:'brass pooja items', spend:1240, clicks:190, orders:0},
+  {term:'silk dupatta', spend:980, clicks:154, orders:0},
+  {term:'journal notebook a5', spend:760, clicks:121, orders:1}
+];
+
+const returnReasons = [
+  {reason:'Damaged in transit', share:34, color:'var(--crimson)'},
+  {reason:'Not as described', share:24, color:'var(--gold)'},
+  {reason:'Quality issue', share:19, color:'var(--green-deep)'},
+  {reason:'Wrong item', share:13, color:'var(--flipkart)'},
+  {reason:'Changed mind', share:10, color:'#7a7a82'}
+];
+
+const orderStatuses=['delivered','transit','pending','returned'];
+const regions=['Maharashtra','Karnataka','Delhi NCR','Tamil Nadu','Gujarat','West Bengal','Telangana','UP'];
+
+function buildOrders(days){
+  const out=[]; const today=new Date('2026-06-29');
+  let id=80450;
+  for(let d=0; d<days; d++){
+    const date=new Date(today); date.setDate(today.getDate()-d);
+    const perDay = 6 + Math.floor(rnd()*7);
+    for(let k=0;k<perDay;k++){
+      const ch = rnd()>0.46?'amazon':'flipkart';
+      const p = products[Math.floor(rnd()*products.length)];
+      const qty = 1+Math.floor(rnd()*3);
+      const price = ch==='amazon'?p.az_price:p.fk_price;
+      const st = rnd()<0.62?'delivered':rnd()<0.5?'transit':rnd()<0.55?'pending':'returned';
+      out.push({id:'#'+(id++),ch,date,sku:p.sku,name:p.name,qty,value:price*qty,
+        region:regions[Math.floor(rnd()*regions.length)],status:st});
+    }
+  }
+  return out;
+}
+
+/* =====================================================================
+   STATE + DERIVATIONS
+   ===================================================================== */
+const STATE={channel:'all',days:30};
+let ALL_ORDERS=buildOrders(90);
+
+const inCh = o => STATE.channel==='all'||o.ch===STATE.channel;
+function windowOrders(){
+  const cutoff=new Date('2026-06-29'); cutoff.setDate(cutoff.getDate()-STATE.days);
+  return ALL_ORDERS.filter(o=>o.date>=cutoff && inCh(o));
+}
+function prevWindowOrders(){
+  const end=new Date('2026-06-29'); end.setDate(end.getDate()-STATE.days);
+  const start=new Date(end); start.setDate(end.getDate()-STATE.days);
+  return ALL_ORDERS.filter(o=>o.date>=start && o.date<end && inCh(o));
+}
+const sum=(arr,f)=>arr.reduce((a,b)=>a+f(b),0);
+function deltaPct(cur,prev){ if(!prev) return 0; return ((cur-prev)/prev)*100; }
+
+/* =====================================================================
+   CHART REGISTRY (so we can destroy/rebuild on filter change)
+   ===================================================================== */
+const charts={};
+function mkChart(id,cfg){ if(charts[id])charts[id].destroy(); const el=document.getElementById(id); if(!el)return; charts[id]=new Chart(el,cfg); }
+const C={ amazon:'#d4af37', flipkart:'#3f8fe0', crimson:'#c22222', gold:'#d4af37', green:'#2ecc71', grid:'rgba(255,255,255,.05)', tick:'#8a857c' };
+Chart.defaults.font.family="'Inter',sans-serif"; Chart.defaults.color=C.tick; Chart.defaults.font.size=11;
+const baseScales=(money)=>({
+  x:{grid:{color:C.grid,drawBorder:false},ticks:{maxTicksLimit:8}},
+  y:{grid:{color:C.grid,drawBorder:false},ticks:{callback:v=>money?fmt.inrK(v):fmt.n(v)},beginAtZero:true}
+});
+const tipMoney={callbacks:{label:c=>' '+c.dataset.label+': '+fmt.inr(c.parsed.y)}};
+
+/* =====================================================================
+   RENDERERS
+   ===================================================================== */
+function kpiTile(lab,val,sub,deltaVal,split){
+  let d='';
+  if(deltaVal!==null&&deltaVal!==undefined){
+    const up=deltaVal>=0;
+    d=`<span class="delta ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(deltaVal).toFixed(1)}%</span>`;
+  }
+  return `<div class="kpi"><div class="lab">${lab}</div><div class="val">${val}</div>
+    <div class="meta">${d}${split?`<span class="split-mini">${split}</span>`:`<span class="split-mini">${sub||''}</span>`}</div></div>`;
+}
+
+function channelSplitStr(orders){
+  const az=sum(orders.filter(o=>o.ch==='amazon'),o=>o.value);
+  const fk=sum(orders.filter(o=>o.ch==='flipkart'),o=>o.value);
+  const t=az+fk||1;
+  return `<b style="color:var(--amazon)">A ${Math.round(az/t*100)}%</b> · <b style="color:var(--flipkart)">F ${Math.round(fk/t*100)}%</b>`;
+}
+
+function renderOverview(){
+  const cur=windowOrders(), prev=prevWindowOrders();
+  const rev=sum(cur,o=>o.value), prevRev=sum(prev,o=>o.value);
+  const orders=cur.length, prevOrders=prev.length;
+  const aov=orders?rev/orders:0, prevAov=prevOrders?prevRev/prevOrders:0;
+  // ACOS only meaningful for amazon
+  const adSpend=sum(campaigns,c=>c.spend), adSales=sum(campaigns,c=>c.sales);
+  const acos=adSales?adSpend/adSales*100:0;
+
+  document.getElementById('ov-kpis').innerHTML=[
+    kpiTile('Net Revenue',fmt.inrK(rev),null,deltaPct(rev,prevRev),channelSplitStr(cur)),
+    kpiTile('Orders',fmt.n(orders),null,deltaPct(orders,prevOrders),channelSplitStr(cur)),
+    kpiTile('Avg Order Value',fmt.inr(aov),null,deltaPct(aov,prevAov),'per order'),
+    kpiTile('Blended ACOS',fmt.pc(acos),null,-3.2,'Amazon ads')
+  ].join('');
+
+  // trend
+  trendChart('ov-trend');
+  donutChart('ov-donut','ov-donut-leg',cur);
+
+  // decisions
+  const decs=getDecisions();
+  document.getElementById('ov-decisions').innerHTML=decs.map(decisionHtml).join('')||'<div class="empty">No decisions pending 🎉</div>';
+  injectIcons();
+
+  // top products
+  const byP={};
+  cur.forEach(o=>{byP[o.name]=(byP[o.name]||0)+o.value;});
+  const top=Object.entries(byP).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const max=top.length?top[0][1]:1;
+  document.getElementById('ov-top').innerHTML=top.map(([n,v])=>`
+    <div style="margin-bottom:14px"><div class="flex between" style="margin-bottom:6px"><span class="tiny strong" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n}</span><span class="num tiny">${fmt.inrK(v)}</span></div>
+    <div class="bar"><i style="width:${v/max*100}%;background:linear-gradient(90deg,var(--crimson),var(--gold))"></i></div></div>`).join('')||'<div class="empty">No data</div>';
+}
+
+function trendChart(id){
+  const days=STATE.days; const labels=[]; const az=[],fk=[];
+  const today=new Date('2026-06-29');
+  // bucket by day (or by ~ for 90)
+  const step=days>30?3:1;
+  for(let d=days-1; d>=0; d-=step){
+    const dt=new Date(today); dt.setDate(today.getDate()-d);
+    labels.push(dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}));
+    const lo=new Date(dt); const hi=new Date(dt); hi.setDate(dt.getDate()+step);
+    const slice=ALL_ORDERS.filter(o=>o.date>=lo&&o.date<hi);
+    az.push(sum(slice.filter(o=>o.ch==='amazon'),o=>o.value));
+    fk.push(sum(slice.filter(o=>o.ch==='flipkart'),o=>o.value));
+  }
+  const ds=[];
+  if(STATE.channel!=='flipkart') ds.push({label:'Amazon',data:az,borderColor:C.amazon,backgroundColor:'rgba(212,175,55,.12)',fill:true,tension:.4,borderWidth:2,pointRadius:0});
+  if(STATE.channel!=='amazon') ds.push({label:'Flipkart',data:fk,borderColor:C.flipkart,backgroundColor:'rgba(63,143,224,.10)',fill:true,tension:.4,borderWidth:2,pointRadius:0});
+  mkChart(id,{type:'line',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:tipMoney},scales:baseScales(true),interaction:{mode:'index',intersect:false}}});
+}
+
+function donutChart(id,legId,orders){
+  const az=sum(orders.filter(o=>o.ch==='amazon'),o=>o.value);
+  const fk=sum(orders.filter(o=>o.ch==='flipkart'),o=>o.value);
+  mkChart(id,{type:'doughnut',data:{labels:['Amazon','Flipkart'],datasets:[{data:[az,fk],backgroundColor:[C.amazon,C.flipkart],borderColor:'#0c0c0e',borderWidth:3,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+c.label+': '+fmt.inr(c.parsed)}}}}});
+  const t=az+fk||1;
+  document.getElementById(legId).innerHTML=
+    `<span><i style="background:var(--amazon)"></i>Amazon · ${Math.round(az/t*100)}% · ${fmt.inrK(az)}</span>
+     <span><i style="background:var(--flipkart)"></i>Flipkart · ${Math.round(fk/t*100)}% · ${fmt.inrK(fk)}</span>`;
+}
+
+function decisionHtml(d){
+  return `<div class="decision"><div class="ic" data-ico="${d.icon}"></div>
+    <div style="flex:1"><h4>${d.title}<span class="sev ${d.sev}">${d.sevLabel}</span> ${d.ch?`<span class="chip ${d.ch}"><span class="swatch"></span>${d.ch[0].toUpperCase()+d.ch.slice(1)}</span>`:''}</h4>
+    <p>${d.body}</p>
+    <div class="act"><button class="btn ghost" onclick="askClaude('${d.ask}')">${'{spark}'} Ask Claude</button></div></div></div>`;
+}
+
+function getDecisions(){
+  const cur=windowOrders();
+  const list=[];
+  // stockout
+  products.forEach(p=>{
+    const vel=(p.az_vel+p.fk_vel);
+    const stock=p.az_stock+p.fk_stock;
+    const cover=stock/vel;
+    if(cover<10 && (STATE.channel==='all')){
+      list.push({icon:'box',title:`Stockout risk · ${p.name}`,sev:'high',sevLabel:'High',ch:p.az_stock<p.fk_stock?'amazon':'flipkart',
+        body:`Only ${Math.round(cover)} days of cover at current velocity (${vel.toFixed(1)} units/day). Reorder before it hits zero.`,
+        ask:`Plan a restock for ${p.sku} — how many units to order to cover 45 days plus a Diwali buffer?`});
+    }
+  });
+  // wasted spend
+  const totalWaste=sum(wasted.filter(w=>w.orders===0),w=>w.spend);
+  if(STATE.channel!=='flipkart'){
+    list.push({icon:'coin',title:'Wasted ad spend detected',sev:'high',sevLabel:'High',ch:'amazon',
+      body:`${fmt.inr(totalWaste)} spent on ${wasted.filter(w=>w.orders===0).length} search terms with zero orders this period. Add as negative keywords.`,
+      ask:'List the exact negative keywords to add and the campaigns to add them to, with estimated monthly savings.'});
+  }
+  // high acos
+  const bad=campaigns.filter(c=>c.acos>50);
+  if(bad.length && STATE.channel!=='flipkart'){
+    list.push({icon:'target',title:`ACOS outlier · ${bad[0].name}`,sev:'med',sevLabel:'Medium',ch:'amazon',
+      body:`Running at ${bad[0].acos}% ACOS — well above the 28% target. Review bids or pause underperforming keywords.`,
+      ask:`Why is ${bad[0].name} running at high ACOS and what bid changes do you recommend?`});
+  }
+  // return outlier
+  const worst=returnsData().sort((a,b)=>b.rate-a.rate)[0];
+  if(worst){
+    list.push({icon:'rotate',title:`Return-rate spike · ${worst.name}`,sev:'med',sevLabel:'Medium',ch:'',
+      body:`${worst.rate.toFixed(1)}% return rate — top reason "${worst.reason}". Investigate packaging / listing accuracy.`,
+      ask:`Break down returns for ${worst.sku} by reason and channel and suggest fixes.`});
+  }
+  return list;
+}
+
+/* SALES */
+function renderSales(){
+  const cur=windowOrders(),prev=prevWindowOrders();
+  const rev=sum(cur,o=>o.value),prevRev=sum(prev,o=>o.value);
+  const units=sum(cur,o=>o.qty),prevUnits=sum(prev,o=>o.qty);
+  const aov=cur.length?rev/cur.length:0,prevAov=prev.length?prevRev/prev.length:0;
+  document.getElementById('sl-kpis').innerHTML=[
+    kpiTile('Revenue',fmt.inrK(rev),null,deltaPct(rev,prevRev),channelSplitStr(cur)),
+    kpiTile('Orders',fmt.n(cur.length),null,deltaPct(cur.length,prev.length),channelSplitStr(cur)),
+    kpiTile('Units Sold',fmt.n(units),null,deltaPct(units,prevUnits),'items'),
+    kpiTile('Avg Order Value',fmt.inr(aov),null,deltaPct(aov,prevAov),'per order')
+  ].join('');
+
+  // orders per day bar
+  const days=Math.min(STATE.days,30); const labels=[],az=[],fk=[]; const today=new Date('2026-06-29');
+  for(let d=days-1;d>=0;d--){const dt=new Date(today);dt.setDate(today.getDate()-d);
+    labels.push(dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}));
+    const slice=ALL_ORDERS.filter(o=>o.date.toDateString()===dt.toDateString());
+    az.push(slice.filter(o=>o.ch==='amazon').length); fk.push(slice.filter(o=>o.ch==='flipkart').length);}
+  const ds=[];
+  if(STATE.channel!=='flipkart')ds.push({label:'Amazon',data:az,backgroundColor:C.amazon,borderRadius:4,stack:'s'});
+  if(STATE.channel!=='amazon')ds.push({label:'Flipkart',data:fk,backgroundColor:C.flipkart,borderRadius:4,stack:'s'});
+  mkChart('sl-orders',{type:'bar',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:true,grid:{color:C.grid}},y:{stacked:true,grid:{color:C.grid},beginAtZero:true}}}});
+
+  const recent=[...cur].sort((a,b)=>b.date-a.date).slice(0,12);
+  document.getElementById('sl-count').textContent=fmt.n(cur.length)+' orders in window';
+  document.getElementById('sl-table').innerHTML=`
+    <thead><tr><th>Order</th><th>Channel</th><th>Product</th><th class="right">Qty</th><th class="right">Value</th><th>Region</th><th>Status</th><th>Date</th></tr></thead>
+    <tbody>${recent.map(o=>`<tr>
+      <td class="num strong">${o.id}</td>
+      <td><span class="chip ${o.ch}"><span class="swatch"></span>${o.ch[0].toUpperCase()+o.ch.slice(1)}</span></td>
+      <td class="strong" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.name}</td>
+      <td class="right num">${o.qty}</td>
+      <td class="right num strong">${fmt.inr(o.value)}</td>
+      <td>${o.region}</td>
+      <td><span class="pill ${o.status}">${o.status}</span></td>
+      <td class="tiny">${o.date.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</td>
+    </tr>`).join('')}</tbody>`;
+}
+
+/* INVENTORY */
+function invRows(){
+  return products.map(p=>{
+    let stock,vel;
+    if(STATE.channel==='amazon'){stock=p.az_stock;vel=p.az_vel;}
+    else if(STATE.channel==='flipkart'){stock=p.fk_stock;vel=p.fk_vel;}
+    else{stock=p.az_stock+p.fk_stock;vel=p.az_vel+p.fk_vel;}
+    const cover=vel?stock/vel:999;
+    const status=cover<7?'critical':cover<14?'low':'healthy';
+    return {...p,stock,vel,cover,status};
+  }).sort((a,b)=>a.cover-b.cover);
+}
+function renderInventory(){
+  const rows=invRows();
+  const crit=rows.filter(r=>r.status==='critical').length;
+  const low=rows.filter(r=>r.status==='low').length;
+  const totalUnits=sum(rows,r=>r.stock);
+  document.getElementById('inv-kpis').innerHTML=[
+    kpiTile('SKUs Tracked',fmt.n(rows.length),'across channels',null,'live snapshot'),
+    kpiTile('Critical',`<span style="color:var(--crimson-bright)">${crit}</span>`,'< 7 days cover',null,'reorder now'),
+    kpiTile('Low Stock',`<span style="color:var(--gold-soft)">${low}</span>`,'< 14 days cover',null,'watch'),
+    kpiTile('Units On Hand',fmt.n(totalUnits),'total inventory',null,'snapshot')
+  ].join('');
+  const maxCover=Math.max(...rows.map(r=>r.cover),1);
+  document.getElementById('inv-table').innerHTML=`
+    <thead><tr><th>Product</th><th>SKU</th><th class="right">On Hand</th><th class="right">Velocity</th><th>Days of Cover</th><th>Status</th><th></th></tr></thead>
+    <tbody>${rows.map(r=>{
+      const col=r.status==='critical'?'var(--crimson)':r.status==='low'?'var(--gold)':'var(--green)';
+      return `<tr>
+        <td class="strong">${r.name}</td>
+        <td class="num tiny muted">${r.sku}</td>
+        <td class="right num strong">${fmt.n(r.stock)}</td>
+        <td class="right num">${r.vel.toFixed(1)}/d</td>
+        <td><div class="flex" style="gap:10px"><span class="num" style="min-width:34px">${Math.round(r.cover)}d</span><div class="bar"><i style="width:${Math.min(r.cover/maxCover*100,100)}%;background:${col}"></i></div></div></td>
+        <td><span class="pill ${r.status}">${r.status}</span></td>
+        <td class="right"><button class="btn ghost tiny" style="padding:5px 10px" onclick="askClaude('How many units of ${r.sku} should I reorder to reach 45 days of cover?')">Plan</button></td>
+      </tr>`;}).join('')}</tbody>`;
+  injectIcons();
+}
+
+/* ADVERTISING */
+function renderAdvertising(){
+  document.getElementById('ad-amazon-note').style.display=STATE.channel==='flipkart'?'block':'none';
+  if(STATE.channel==='flipkart'){
+    // show note but no flipkart ad data
+    document.getElementById('ad-kpis').innerHTML=`<div class="card span-2" style="grid-column:1/-1"><div class="empty">Flipkart has no seller-facing advertising API — ad analysis is Amazon-only in v1. Switch the channel filter to <b>Amazon</b> or <b>All</b> to view advertising data.</div></div>`;
+    document.getElementById('ad-camp').innerHTML=''; document.getElementById('ad-waste').innerHTML='';
+    return;
+  }
+  const spend=sum(campaigns,c=>c.spend),sales=sum(campaigns,c=>c.sales);
+  const acos=spend/sales*100;
+  const waste=sum(wasted.filter(w=>w.orders===0),w=>w.spend);
+  document.getElementById('ad-kpis').innerHTML=[
+    kpiTile('Ad Spend',fmt.inrK(spend),'Amazon',8.4,'period'),
+    kpiTile('Ad Sales',fmt.inrK(sales),'attributed',12.1,'period'),
+    kpiTile('ACOS',fmt.pc(acos),'target 28%',-2.6,acos<28?'on target':'above target'),
+    kpiTile('Wasted Spend',`<span style="color:var(--crimson-bright)">${fmt.inrK(waste)}</span>`,'zero-order terms',null,'recoverable')
+  ].join('');
+  document.getElementById('ad-camp').innerHTML=`
+    <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Sales</th><th class="right">ACOS</th><th class="right">Orders</th></tr></thead>
+    <tbody>${campaigns.sort((a,b)=>b.acos-a.acos).map(c=>{
+      const col=c.acos>50?'var(--crimson-bright)':c.acos>28?'var(--gold-soft)':'var(--green-soft)';
+      return `<tr><td class="strong">${c.name}</td><td class="right num">${fmt.inr(c.spend)}</td><td class="right num">${fmt.inr(c.sales)}</td>
+      <td class="right num" style="color:${col};font-weight:700">${c.acos.toFixed(1)}%</td><td class="right num">${c.orders}</td></tr>`;}).join('')}</tbody>`;
+  document.getElementById('ad-waste').innerHTML=`
+    <thead><tr><th>Search Term</th><th class="right">Spend</th><th class="right">Clicks</th><th class="right">Orders</th></tr></thead>
+    <tbody>${wasted.sort((a,b)=>b.spend-a.spend).map(w=>`<tr><td class="strong">${w.term}</td>
+      <td class="right num" style="color:var(--crimson-bright);font-weight:700">${fmt.inr(w.spend)}</td>
+      <td class="right num">${w.clicks}</td><td class="right num">${w.orders===0?'<span style="color:var(--crimson-bright)">0</span>':w.orders}</td></tr>`).join('')}</tbody>`;
+}
+
+/* RETURNS */
+function returnsData(){
+  return products.map(p=>{
+    const base=(p.sku.includes('SILK')||p.sku.includes('VELVET')||p.sku.includes('LEATHER'))?1.6:1;
+    const rate=(2.5+ (rndStable(p.sku))*9)*base;
+    const reasonIdx=Math.floor(rndStable(p.sku+'r')*returnReasons.length);
+    return {...p,rate,reason:returnReasons[reasonIdx].reason,
+      units:Math.round((p.az_vel+p.fk_vel)*STATE.days*rate/100)};
+  });
+}
+function rndStable(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))&0x7fffffff;return (h%1000)/1000;}
+function renderReturns(){
+  const data=returnsData().sort((a,b)=>b.rate-a.rate);
+  const avgRate=data.reduce((a,b)=>a+b.rate,0)/data.length;
+  const totalUnits=sum(data,d=>d.units);
+  document.getElementById('rt-kpis').innerHTML=[
+    kpiTile('Avg Return Rate',fmt.pc(avgRate),'blended',-0.8,'vs prev'),
+    kpiTile('Units Returned',fmt.n(totalUnits),'period',2.1,'window'),
+    kpiTile('Worst SKU',data[0].rate.toFixed(1)+'%','<span class="tiny">'+data[0].sku+'</span>',null,'investigate'),
+    kpiTile('Top Reason',`<small>${returnReasons[0].reason}</small>`,null,null,returnReasons[0].share+'% of returns')
+  ].join('');
+  // reasons doughnut
+  mkChart('rt-reasons',{type:'doughnut',data:{labels:returnReasons.map(r=>r.reason),datasets:[{data:returnReasons.map(r=>r.share),
+    backgroundColor:['#c22222','#d4af37','#1f7a4d','#3f8fe0','#7a7a82'],borderColor:'#0c0c0e',borderWidth:3,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+c.label+': '+c.parsed+'%'}}}}});
+  document.getElementById('rt-leg').innerHTML=returnReasons.map((r,i)=>`<span><i style="background:${['#c22222','#d4af37','#1f7a4d','#3f8fe0','#7a7a82'][i]}"></i>${r.reason} ${r.share}%</span>`).join('');
+  const max=data[0].rate;
+  document.getElementById('rt-table').innerHTML=`
+    <thead><tr><th>Product</th><th class="right">Units Returned</th><th>Return Rate</th><th>Top Reason</th></tr></thead>
+    <tbody>${data.map(d=>`<tr><td class="strong">${d.name}<div class="tiny muted num">${d.sku}</div></td>
+      <td class="right num">${d.units}</td>
+      <td><div class="flex" style="gap:10px"><span class="num" style="min-width:42px">${d.rate.toFixed(1)}%</span><div class="bar"><i style="width:${d.rate/max*100}%;background:linear-gradient(90deg,var(--gold),var(--crimson))"></i></div></div></td>
+      <td>${d.reason}</td></tr>`).join('')}</tbody>`;
+}
+
+/* PRODUCTS */
+function renderProducts(){
+  document.getElementById('pr-table').innerHTML=`
+    <thead><tr><th>Product</th><th>SKU / ASIN / FSN</th><th class="right">Amazon Vel.</th><th class="right">Flipkart Vel.</th><th class="right">Margin</th><th class="right">Total Stock</th><th class="right">Best Channel</th></tr></thead>
+    <tbody>${products.map(p=>{
+      const best=p.az_vel>p.fk_vel?'amazon':'flipkart';
+      const azMargin=(p.az_price-p.cost)/p.az_price*100, fkMargin=(p.fk_price-p.cost)/p.fk_price*100;
+      return `<tr>
+        <td class="strong">${p.name}</td>
+        <td class="num tiny muted">${p.sku}</td>
+        <td class="right num"><span style="color:var(--amazon)">${p.az_vel.toFixed(1)}/d</span></td>
+        <td class="right num"><span style="color:var(--flipkart)">${p.fk_vel.toFixed(1)}/d</span></td>
+        <td class="right num">${((azMargin+fkMargin)/2).toFixed(0)}%</td>
+        <td class="right num">${fmt.n(p.az_stock+p.fk_stock)}</td>
+        <td class="right"><span class="chip ${best}"><span class="swatch"></span>${best[0].toUpperCase()+best.slice(1)}</span></td>
+      </tr>`;}).join('')}</tbody>`;
+}
+
+/* CLAUDE INSIGHTS */
+const suggestions=[
+  'Which keywords are wasting the most spend this week?',
+  'Which SKUs will stock out before Diwali?',
+  'Is the Amber Oud Diffuser more profitable on Amazon or Flipkart?',
+  'Rank my products by return rate and tell me why',
+  'What is my best-margin SKU across both channels?'
+];
+function renderClaude(){
+  document.getElementById('suggested').innerHTML=suggestions.map(s=>`<button onclick="askClaude(this.textContent)">${s}</button>`).join('');
+  const cards=[
+    {tag:'Stockout Risk',title:'3 SKUs stock out within 7 days',body:'Gilded Soy Candle Trio, Obsidian Leather Journal and Heritage Brass Stand fall below 7 days of cover at current velocity.',ev:'SELECT internal_sku FROM inventory ... HAVING days_cover < 7'},
+    {tag:'Wasted Spend',title:'₹7,640 recoverable on Amazon',body:'Six search terms over ₹500 spend produced zero or near-zero orders. Adding them as negatives reclaims spend immediately.',ev:'SELECT search_term, spend FROM ad_spend WHERE orders=0 AND spend>500'},
+    {tag:'Return Spike',title:'Silk Scarf returns trending up',body:'Crimson Silk Scarf shows the highest return rate, driven by "damaged in transit". Review packaging before scaling ads.',ev:'SELECT reason, count(*) FROM returns GROUP BY reason ORDER BY 2 DESC'}
+  ];
+  document.getElementById('cl-cards').innerHTML=cards.map(c=>`<div class="insight-card"><div class="tag">${c.tag}</div><h4>${c.title}</h4><p>${c.body}</p><div class="ev">${c.ev}</div></div>`).join('');
+}
+
+/* simulated Claude answers grounded in the sample warehouse */
+function askClaude(q){
+  go('claude');
+  const thread=document.getElementById('cl-thread');
+  thread.innerHTML+=`<div class="bubble you">${q}</div>`;
+  const typing=document.createElement('div');
+  typing.className='bubble claude'; typing.innerHTML='<div class="who">'+'{spark}'+' Claude · Zensil Ops</div><div class="typing"><i></i><i></i><i></i></div>';
+  thread.appendChild(typing); injectIcons();
+  thread.scrollIntoView({behavior:'smooth',block:'end'});
+  setTimeout(()=>{typing.innerHTML='<div class="who">'+'{spark}'+' Claude · Zensil Ops</div>'+claudeAnswer(q); injectIcons(); thread.lastChild.scrollIntoView({behavior:'smooth',block:'end'});},900);
+}
+function claudeAnswer(q){
+  q=q.toLowerCase();
+  if(q.includes('wast')||q.includes('negative')||q.includes('keyword')){
+    const w=wasted.filter(x=>x.orders===0);
+    return `I queried <code>ad_spend</code> for the selected window:
+    <div class="sql">SELECT keyword_or_search_term, spend, clicks, orders
+FROM ad_spend
+WHERE channel='amazon' AND orders=0 AND spend>500
+ORDER BY spend DESC;</div>
+    <b>${w.length} search terms</b> burned <b>${fmt.inr(sum(w,x=>x.spend))}</b> with zero orders. Add these as <b>negative exact</b> keywords:
+    <ul style="margin:8px 0 0 18px">${w.slice(0,4).map(x=>`<li>“${x.term}” — ${fmt.inr(x.spend)}, ${x.clicks} clicks</li>`).join('')}</ul>
+    <p style="margin-top:8px">Estimated monthly saving ≈ <b>${fmt.inr(sum(w,x=>x.spend)*1.4)}</b>. Recommendation: apply negatives to the broad/auto campaigns, keep exact campaigns running. <i>You approve and execute in Seller Central.</i></p>`;
+  }
+  if(q.includes('stock')||q.includes('restock')||q.includes('diwali')||q.includes('reorder')){
+    const rows=invRows().filter(r=>r.cover<14);
+    return `Using daily <code>inventory</code> snapshots vs trailing-14-day velocity:
+    <div class="sql">SELECT internal_sku, available_qty,
+       available_qty / vel_14d AS days_cover
+FROM inventory_latest JOIN velocity USING(internal_sku)
+WHERE days_cover < 14 ORDER BY days_cover;</div>
+    <b>${rows.length} SKUs</b> need attention:
+    <ul style="margin:8px 0 0 18px">${rows.slice(0,5).map(r=>`<li><b>${r.name}</b> — ${Math.round(r.cover)} days cover, reorder ≈ <b>${Math.ceil(r.vel*45 - r.stock)} units</b> for 45-day cover</li>`).join('')}</ul>
+    <p style="margin-top:8px">With Big Billion Days / Diwali demand lift, add a 30% buffer on the candle and serum lines.</p>`;
+  }
+  if(q.includes('margin')||q.includes('profitable')||q.includes('amazon or flipkart')){
+    const p=products.find(x=>q.includes(x.name.toLowerCase().split(' ')[1]))||products[0];
+    const azM=(p.az_price-p.cost)/p.az_price*100,fkM=(p.fk_price-p.cost)/p.fk_price*100;
+    return `Joining <code>order_items</code> to <code>sku_master</code> economics for ${p.name}:
+    <div class="sql">SELECT channel, AVG(unit_price), cost_price,
+   (AVG(unit_price)-cost_price)/AVG(unit_price)*100 AS margin
+FROM order_items JOIN sku_master USING(internal_sku)
+WHERE internal_sku='${p.sku}' GROUP BY channel;</div>
+    <table style="margin-top:6px"><tbody>
+    <tr><td><span class="chip amazon"><span class="swatch"></span>Amazon</span></td><td class="right num">${fmt.inr(p.az_price)}</td><td class="right num strong">${azM.toFixed(1)}% margin</td></tr>
+    <tr><td><span class="chip flipkart"><span class="swatch"></span>Flipkart</span></td><td class="right num">${fmt.inr(p.fk_price)}</td><td class="right num strong">${fkM.toFixed(1)}% margin</td></tr>
+    </tbody></table>
+    <p style="margin-top:8px"><b>${azM>fkM?'Amazon':'Flipkart'}</b> yields the higher contribution margin (${Math.abs(azM-fkM).toFixed(1)} pts). Velocity favours <b>${p.az_vel>p.fk_vel?'Amazon':'Flipkart'}</b>, so push inventory there.</p>`;
+  }
+  if(q.includes('return')){
+    const d=returnsData().sort((a,b)=>b.rate-a.rate);
+    return `Ranking <code>returns</code> against <code>order_items</code> by <code>internal_sku</code>:
+    <div class="sql">SELECT internal_sku, COUNT(*) ret, reason
+FROM returns GROUP BY internal_sku, reason
+ORDER BY ret DESC;</div>
+    <ul style="margin:8px 0 0 18px">${d.slice(0,4).map(x=>`<li><b>${x.name}</b> — ${x.rate.toFixed(1)}% · top reason “${x.reason}”</li>`).join('')}</ul>
+    <p style="margin-top:8px">The leaders are textile/leather lines with “damaged in transit” dominant — a packaging fix, not a product defect. Recommend reinforced packaging before scaling ads.</p>`;
+  }
+  return `I'd answer that by writing SQL against the read-only warehouse and reasoning over the result — for example pulling the relevant rows from <code>orders</code>, <code>order_items</code>, <code>inventory</code> or <code>ad_spend</code>, joining to <code>sku_master</code> for economics, and returning a recommendation with the evidence behind it. Try one of the suggested questions above for a worked example grounded in your live data.`;
+}
+
+/* =====================================================================
+   NAVIGATION
+   ===================================================================== */
+const PAGES={
+  overview:{title:'Overview',sub:'Headline performance across both marketplaces',render:renderOverview},
+  sales:{title:'Sales & Orders',sub:'Revenue, orders and fulfilment status',render:renderSales},
+  inventory:{title:'Inventory',sub:'Stock health & stockout forecasting',render:renderInventory},
+  advertising:{title:'Advertising',sub:'Amazon campaign performance & wasted spend',render:renderAdvertising},
+  returns:{title:'Returns',sub:'Return-rate outliers & reasons',render:renderReturns},
+  products:{title:'Products',sub:'Cross-channel SKU master',render:renderProducts},
+  claude:{title:'Claude Insights',sub:'Ask plain-English questions over live data',render:renderClaude}
+};
+let current='overview';
+function go(page){
+  current=page;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.page===page));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.getElementById('pgTitle').textContent=PAGES[page].title;
+  document.getElementById('pgSub').textContent=PAGES[page].sub;
+  PAGES[page].render();
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('scrim').classList.remove('show');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function refreshAll(){ PAGES[current].render(); }
+
+/* =====================================================================
+   ICON INJECTION (replace {spark} text + data-ico attrs)
+   ===================================================================== */
+function injectIcons(){
+  // sidebar/static nav icons were already rendered as ico() string at template time? No — they are literal.
+  document.querySelectorAll('[data-ico]').forEach(el=>{ if(!el.dataset.done){el.innerHTML=ico(el.dataset.ico); el.dataset.done='1';}});
+  // replace literal {spark} tokens
+  document.querySelectorAll('.btn,.who').forEach(el=>{ if(el.innerHTML.includes('{spark}')) el.innerHTML=el.innerHTML.replace('{spark}',ico('spark')); });
+}
+
+/* =====================================================================
+   WIRE UP
+   ===================================================================== */
+function init(){
+  // Replace literal ${ico('name')} tokens that ended up as text in static HTML
+  replaceLiteralIcons(document.getElementById('nav'));
+  replaceLiteralIcons(document.body);
+  injectIcons();
+
+  // channel filter
+  document.getElementById('channelSeg').addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b)return;
+    STATE.channel=b.dataset.ch;
+    document.querySelectorAll('#channelSeg button').forEach(x=>x.classList.toggle('on',x===b));
+    refreshAll();
+  });
+  // range filter
+  document.getElementById('rangeSeg').addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b)return;
+    STATE.days=+b.dataset.d;
+    document.querySelectorAll('#rangeSeg button').forEach(x=>x.classList.toggle('on',x===b));
+    refreshAll();
+  });
+  // nav
+  document.getElementById('nav').addEventListener('click',e=>{
+    const n=e.target.closest('.nav-item'); if(!n)return; go(n.dataset.page);
+  });
+  // ask box
+  document.getElementById('askBtn').addEventListener('click',()=>{
+    const v=document.getElementById('askInput').value.trim(); if(v){askClaude(v);document.getElementById('askInput').value='';}
+  });
+  document.getElementById('askInput').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('askBtn').click();});
+  // mobile menu
+  document.getElementById('menuBtn').addEventListener('click',()=>{document.getElementById('sidebar').classList.toggle('open');document.getElementById('scrim').classList.toggle('show');});
+  document.getElementById('scrim').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('scrim').classList.remove('show');});
+
+  go('overview');
+}
+
+/* utility: turn literal "${ico('x')}" strings (left by static template) into real SVG */
+function replaceLiteralIcons(root){
+  const re=/\$\{ico\('([a-z]+)'(?:,'([^']+)')?\)\}/g;
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{
+    acceptNode:n=>{
+      const p=n.parentNode&&n.parentNode.nodeName;
+      if(p==='SCRIPT'||p==='STYLE')return NodeFilter.FILTER_REJECT;
+      return n.nodeValue.indexOf("${ico(")>-1?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP;
+    }
+  });
+  const targets=[];
+  while(walker.nextNode()){ targets.push(walker.currentNode); }
+  targets.forEach(node=>{
+    const span=document.createElement('span'); span.style.display='inline-flex'; span.style.alignItems='center';
+    span.innerHTML=node.nodeValue.replace(re,(m,n,s)=>ico(n,s));
+    node.parentNode.replaceChild(span,node);
+  });
+}
+
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>

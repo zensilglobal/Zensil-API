@@ -1,0 +1,23 @@
+# Zensil Ops — full stack for local / self-hosted runs.
+# The warehouse is Neon (managed), so no Postgres service is needed here.
+#   docker compose up --build web          # dashboard on :3000
+#   docker compose run --rm etl            # run all ingestion pipelines once
+services:
+  web:
+    build:
+      context: ./apps/web
+    image: zensil-web
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./apps/web/.env.local
+    restart: unless-stopped
+
+  etl:
+    build:
+      context: ./etl
+    image: zensil-etl
+    env_file:
+      - ./etl/.env
+    profiles: ["etl"] # on-demand: `docker compose run --rm etl`; schedule via GitHub Actions in prod
+    restart: "no"

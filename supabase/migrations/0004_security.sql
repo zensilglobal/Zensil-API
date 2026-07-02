@@ -1,0 +1,25 @@
+-- =====================================================================
+-- 0004_security — Neon warehouse security.
+--
+-- On Supabase this file enabled Row-Level Security with a `TO authenticated`
+-- policy, because the tables were exposed publicly through PostgREST and the
+-- anon/authenticated roles gated that API. Neon has no PostgREST and no
+-- built-in auth roles, so that model does not apply:
+--   * The ETL writer connects as the database owner (neondb_owner).
+--   * The web app connects server-side with DATABASE_URL — it is never
+--     exposed to the browser, so there is no anonymous SQL surface to fence.
+-- RLS is therefore intentionally NOT enabled here.
+--
+-- Optional: a read-only role for the Claude Postgres MCP connector (PRD §11),
+-- so Claude can query the warehouse but never mutate it. Create it once with a
+-- real password, then point the MCP server at it:
+--
+--   CREATE ROLE zensil_readonly LOGIN PASSWORD 'change-me';
+--   GRANT USAGE ON SCHEMA public TO zensil_readonly;
+--   GRANT SELECT ON ALL TABLES IN SCHEMA public TO zensil_readonly;
+--   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO zensil_readonly;
+--   ALTER ROLE zensil_readonly SET statement_timeout = '15s';
+-- =====================================================================
+
+-- No-op on Neon (kept so the migration sequence 0001..0004 stays contiguous).
+SELECT 1;
