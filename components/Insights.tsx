@@ -1,7 +1,19 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Sparkles, Send, ShieldCheck, Database, ArrowUpRight } from "lucide-react";
+import {
+  Sparkles,
+  Send,
+  ShieldCheck,
+  Database,
+  ArrowUpRight,
+  FileText,
+  Package,
+  Target,
+  RotateCw,
+  Percent,
+  Rocket,
+} from "lucide-react";
 
 interface Msg {
   role: "you" | "claude";
@@ -39,6 +51,51 @@ const CARDS = [
     body: 'Crimson Silk Scarf shows the highest return rate, driven by "damaged in transit". Review packaging before scaling ads.',
     ev: "SELECT reason, count(*) FROM returns GROUP BY reason ORDER BY 2 DESC",
     q: "Break down returns for the Crimson Silk Scarf by reason and suggest fixes.",
+  },
+];
+
+const SKILLS = [
+  {
+    icon: FileText,
+    title: "Weekly Business Review",
+    blurb: "Revenue, channel mix, top wins & risks, and the one move to make this week.",
+    prompt:
+      "Give me a weekly business review across all channels: revenue and channel mix, the 3 biggest wins and 3 biggest risks right now, and the single most important action to take this week. Quantify each point.",
+  },
+  {
+    icon: Package,
+    title: "Restock Planner",
+    blurb: "SKUs at stockout risk with exact reorder quantities and a festive buffer.",
+    prompt:
+      "Which SKUs are at stockout risk, and exactly how many units should I reorder for each to reach 45 days of cover plus a Diwali buffer? Prioritise by urgency and total the units.",
+  },
+  {
+    icon: Target,
+    title: "PPC Optimizer",
+    blurb: "ACOS outliers, negative keywords to add, and bid changes to make.",
+    prompt:
+      "Audit my Amazon advertising: flag every campaign above the 28% ACOS target, list the search terms to add as negatives with the spend they will save, and recommend specific bid changes.",
+  },
+  {
+    icon: RotateCw,
+    title: "Returns Root-Cause",
+    blurb: "What's driving returns and the fixes that cut the rate.",
+    prompt:
+      "Which products drive the most returns, what are the root-cause reasons, and what specific fixes (packaging, listing accuracy, QC) will cut the return rate? Estimate the impact.",
+  },
+  {
+    icon: Percent,
+    title: "Margin Maximizer",
+    blurb: "Best & worst margin SKUs and where to shift inventory.",
+    prompt:
+      "Rank my SKUs by contribution margin, show which channel is most profitable for each, and tell me where to shift inventory to maximise total margin.",
+  },
+  {
+    icon: Rocket,
+    title: "Growth Opportunities",
+    blurb: "Under-stocked bestsellers and channels you're under-indexed on.",
+    prompt:
+      "Where are my biggest growth opportunities right now — under-stocked bestsellers, high-margin SKUs to push harder, or channels I am under-indexed on? Give me 3 concrete moves.",
   },
 ];
 
@@ -158,6 +215,28 @@ export default function Insights() {
 
       {messages.length === 0 && (
         <>
+          <div className="skills-head">
+            <h3>Analyst Skills</h3>
+            <p>One-click workflows — each runs a full analysis on your live data, run by Claude</p>
+          </div>
+          <div className="skill-grid">
+            {SKILLS.map((s) => {
+              const Icon = s.icon;
+              return (
+                <button key={s.title} className="skill-card" onClick={() => ask(s.prompt)}>
+                  <span className="skill-ic">
+                    <Icon size={17} />
+                  </span>
+                  <span className="skill-body">
+                    <span className="skill-title">{s.title}</span>
+                    <span className="skill-blurb">{s.blurb}</span>
+                  </span>
+                  <ArrowUpRight size={15} className="skill-arrow" />
+                </button>
+              );
+            })}
+          </div>
+
           <div className="insight-lead">
             <span>Surfaced now</span> — tap a card to open the full analysis
           </div>
