@@ -3,7 +3,9 @@ import { Sparkles } from "lucide-react";
 import { parseFilter } from "@/lib/filter";
 import { getInventoryKpis, getStockHealth } from "@/lib/queries";
 import { num } from "@/lib/format";
+import { restockCsv, todayStamp } from "@/lib/exports";
 import { askHref } from "@/components/DecisionCard";
+import DownloadCsv from "@/components/DownloadCsv";
 import { KpiGrid, Card, StatusPill, Bar } from "@/components/ui";
 
 export default async function InventoryPage({
@@ -14,6 +16,8 @@ export default async function InventoryPage({
   const f = parseFilter(await searchParams);
   const [kpis, rows] = await Promise.all([getInventoryKpis(f), getStockHealth(f)]);
   const maxCover = Math.max(...rows.map((r) => r.cover), 1);
+  const needsRestock = rows.filter((r) => r.status !== "healthy");
+  const restockRows = needsRestock.length ? needsRestock : rows;
 
   return (
     <>
@@ -23,12 +27,19 @@ export default async function InventoryPage({
           title="Stock Health"
           sub="Days-of-cover at trailing-14-day velocity · sorted by urgency"
           action={
-            <Link
-              className="btn gold"
-              href={askHref("Plan a restock for all SKUs with fewer than 14 days of cover before the next sale event", f)}
-            >
-              <Sparkles size={15} /> Ask Claude to plan a restock
-            </Link>
+            <div className="flex" style={{ gap: 8 }}>
+              <DownloadCsv
+                csv={restockCsv(restockRows)}
+                filename={`zensil-restock-${todayStamp()}.csv`}
+                label="Export restock plan"
+              />
+              <Link
+                className="btn gold"
+                href={askHref("Plan a restock for all SKUs with fewer than 14 days of cover before the next sale event", f)}
+              >
+                <Sparkles size={15} /> Ask Claude to plan a restock
+              </Link>
+            </div>
           }
         >
           <div style={{ overflowX: "auto" }}>

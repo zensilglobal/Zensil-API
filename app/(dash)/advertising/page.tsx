@@ -3,7 +3,9 @@ import { Sparkles, Info } from "lucide-react";
 import { parseFilter } from "@/lib/filter";
 import { getAdvertisingKpis, getCampaigns, getWasted, adChannelAvailable } from "@/lib/queries";
 import { inr } from "@/lib/format";
+import { negativesCsv, todayStamp } from "@/lib/exports";
 import { askHref } from "@/components/DecisionCard";
+import DownloadCsv from "@/components/DownloadCsv";
 import { KpiGrid, Card } from "@/components/ui";
 
 export default async function AdvertisingPage({
@@ -74,12 +76,20 @@ export default async function AdvertisingPage({
           title="Wasted Spend — Search Terms"
           sub="Over ₹500 spend, zero / near-zero orders"
           action={
-            <Link
-              className="btn ghost"
-              href={askHref("Which search terms should I add as negative keywords this week and how much spend will it save?", f)}
-            >
-              <Sparkles size={15} /> Harvest negatives
-            </Link>
+            <div className="flex" style={{ gap: 8 }}>
+              <DownloadCsv
+                csv={negativesCsv(wasted)}
+                filename={`amazon-negative-keywords-${todayStamp()}.csv`}
+                label="Export bulk sheet"
+                disabled={wasted.length === 0}
+              />
+              <Link
+                className="btn ghost"
+                href={askHref("Which search terms should I add as negative keywords this week and how much spend will it save?", f)}
+              >
+                <Sparkles size={15} /> Harvest negatives
+              </Link>
+            </div>
           }
         >
           <div style={{ overflowX: "auto" }}>
