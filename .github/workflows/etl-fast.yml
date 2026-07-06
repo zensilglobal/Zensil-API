@@ -1,0 +1,34 @@
+name: ETL fast lane (orders)
+
+# Near-real-time orders: pulls only the last day of Amazon orders every
+# 10 minutes (~40s run). The full 3-hourly run (etl.yml) still refreshes
+# older order statuses, inventory, returns and ads. GitHub cron is
+# best-effort — expect occasional 5-15 min drift at busy times.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: zensil-etl-fast
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+        working-directory: etl
+      - name: Sync recent Amazon orders
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SPAPI_CLIENT_ID: ${{ secrets.SPAPI_CLIENT_ID }}
+          SPAPI_CLIENT_SECRET: ${{ secrets.SPAPI_CLIENT_SECRET }}
+          SPAPI_REFRESH_TOKEN: ${{ secrets.SPAPI_REFRESH_TOKEN }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          AMAZON_ORDERS_LOOKBACK_DAYS: "1"
+        run: python -m etl.run_all --only amazon_orders

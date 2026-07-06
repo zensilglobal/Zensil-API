@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import {
@@ -55,6 +55,15 @@ export default function AppFrame({
   const searchParams = useSearchParams();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  // Live dashboard: re-fetch all server data every 60s (only while the tab
+  // is visible) so new orders appear without a manual reload.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [router]);
 
   const channel = (searchParams.get("channel") as ChannelFilter) || "all";
   const days = (Number(searchParams.get("days")) || 30) as RangeDays;

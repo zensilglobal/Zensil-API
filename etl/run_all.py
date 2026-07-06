@@ -34,10 +34,19 @@ PIPELINES = [
 ]
 
 
-def main() -> int:
+def parse_only(argv: list[str]) -> set[str] | None:
+    """--only a,b → {"a","b"}; None = run everything."""
+    if "--only" in argv:
+        raw = argv[argv.index("--only") + 1]
+        return {s.strip() for s in raw.split(",") if s.strip()}
+    return None
+
+
+def main(only: set[str] | None = None) -> int:
     failures = 0
     ran = 0
-    for mod in PIPELINES:
+    selected = [m for m in PIPELINES if only is None or m.SOURCE in only]
+    for mod in selected:
         source = mod.SOURCE
         if not mod.enabled():
             log.info("· %s — skipped (credentials not configured)", source)
@@ -62,9 +71,9 @@ def main() -> int:
             except Exception:  # noqa: BLE001
                 pass
 
-    log.info("Run complete — %d ran, %d failed, %d skipped", ran, failures, len(PIPELINES) - ran)
+    log.info("Run complete — %d ran, %d failed, %d skipped", ran, failures, len(selected) - ran)
     return 1 if failures else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(parse_only(sys.argv[1:])))
