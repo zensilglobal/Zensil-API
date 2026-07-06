@@ -12,6 +12,7 @@ from etl.pipelines import (
     amazon_ads_reports,
     amazon_inventory,
     amazon_orders,
+    amazon_returns,
     flipkart_inventory,
     flipkart_orders,
     shopify_inventory,
@@ -24,6 +25,7 @@ log = logging.getLogger("zensil.etl")
 PIPELINES = [
     amazon_orders,
     amazon_inventory,
+    amazon_returns,
     amazon_ads_reports,
     flipkart_orders,
     flipkart_inventory,
@@ -42,8 +44,12 @@ def main() -> int:
             continue
         ran += 1
         try:
+            # Fetch BEFORE opening the warehouse connection: the rate-limited
+            # API calls take minutes and Neon's pooler drops idle sessions
+            # ("SSL connection has been closed unexpectedly").
+            data = mod.fetch()
             with get_conn() as conn:
-                count = mod.run(conn)
+                count = mod.persist(conn, data)
                 mark_sync(conn, source, "ok")
             log.info("✓ %s — %s records", source, count)
         except Exception as exc:  # noqa: BLE001 — isolate per source

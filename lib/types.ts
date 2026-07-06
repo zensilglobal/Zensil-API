@@ -99,3 +99,9 @@ export interface ChannelSplit {
   flipkart: number;
   shopify: number;
 }
+
+/** Warehouse freshness for the sidebar pill; null = sample-data mode. */
+export interface SyncStatus {
+  label: string; // e.g. "2h ago"
+  ok: boolean; // false when stale (>6h) or a pipeline reported an error
+}

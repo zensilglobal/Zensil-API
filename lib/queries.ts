@@ -34,5 +34,8 @@ export const getReturnReasons = () => (live ? wh.returnReasons() : Promise.resol
 export const getProducts = () => (live ? wh.products() : Promise.resolve(mock.getProducts()));
 export const decisionCount = () => (live ? wh.decisionCount() : Promise.resolve(mock.decisionCount()));
 
+// null in sample mode → the sidebar pill says "Sample data" instead of lying.
+export const getSyncStatus = () => (live ? wh.syncStatus() : Promise.resolve(null));
+
 // pure helpers (no data source)
 export { adChannelAvailable } from "./data";

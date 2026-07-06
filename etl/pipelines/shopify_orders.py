@@ -34,7 +34,8 @@ def enabled() -> bool:
     return settings.has_shopify()
 
 
-def run(conn: psycopg.Connection) -> int:
+def fetch() -> tuple[list[dict], list[dict]]:
+    """Pull + transform all pages. Holds NO DB conn (Neon drops idle sessions)."""
     headers = shopify.auth_headers()
     url = shopify.graphql_url()
     cursor: str | None = None
@@ -68,7 +69,15 @@ def run(conn: psycopg.Connection) -> int:
             if not data["pageInfo"]["hasNextPage"]:
                 break
             cursor = data["pageInfo"]["endCursor"]
+    return order_rows, item_rows
 
+
+def persist(conn: psycopg.Connection, data: tuple[list[dict], list[dict]]) -> int:
+    order_rows, item_rows = data
     upsert(conn, "orders", order_rows, conflict_keys=["channel", "order_id"])
     upsert(conn, "order_items", item_rows, conflict_keys=["channel", "order_id", "line_no"])
     return len(order_rows)
+
+
+def run(conn: psycopg.Connection) -> int:
+    return persist(conn, fetch())

@@ -4,6 +4,8 @@ Requires Direct Advertiser approval (longest lead-time item)."""
 from __future__ import annotations
 
 import datetime as dt
+import gzip
+import json
 import time
 
 import httpx
@@ -20,7 +22,8 @@ def enabled() -> bool:
     return settings.has_ads()
 
 
-def run(conn: psycopg.Connection) -> int:
+def fetch() -> list[dict]:
+    """Request → poll → download the search-term report. Holds NO DB conn."""
     headers = amazon_ads.auth_headers()
     report_date = (dt.date.today() - dt.timedelta(days=1)).isoformat()
     rows: list[dict] = []
@@ -60,9 +63,6 @@ def run(conn: psycopg.Connection) -> int:
             raise TimeoutError("Amazon Ads report did not complete in time.")
 
         # 3) download + transform (GZIP JSON array of rows)
-        import gzip
-        import json
-
         raw = httpx.get(url, timeout=120).content
         records = json.loads(gzip.decompress(raw))
         for r in records:
@@ -77,8 +77,15 @@ def run(conn: psycopg.Connection) -> int:
                 "attributed_sales": r.get("sales30d", 0),
                 "orders": r.get("purchases30d", 0),
             })
+    return rows
 
+
+def persist(conn: psycopg.Connection, rows: list[dict]) -> int:
     return upsert(
         conn, "ad_spend", rows,
         conflict_keys=["report_date", "campaign", "ad_group", "keyword_or_search_term"],
     )
+
+
+def run(conn: psycopg.Connection) -> int:
+    return persist(conn, fetch())

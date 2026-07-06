@@ -16,7 +16,8 @@ def enabled() -> bool:
     return settings.has_flipkart()
 
 
-def run(conn: psycopg.Connection) -> int:
+def fetch() -> tuple[list[dict], list[dict]]:
+    """Pull + transform. Holds NO DB conn (Neon drops idle sessions)."""
     headers = flipkart.auth_headers()
     order_rows: list[dict] = []
     item_rows: list[dict] = []
@@ -52,7 +53,15 @@ def run(conn: psycopg.Connection) -> int:
                     "unit_price": li.get("sellingPrice"),
                 })
         # TODO: follow payload["nextPageUrl"] until exhausted.
+    return order_rows, item_rows
 
+
+def persist(conn: psycopg.Connection, data: tuple[list[dict], list[dict]]) -> int:
+    order_rows, item_rows = data
     upsert(conn, "orders", order_rows, conflict_keys=["channel", "order_id"])
     upsert(conn, "order_items", item_rows, conflict_keys=["channel", "order_id", "line_no"])
     return len(order_rows)
+
+
+def run(conn: psycopg.Connection) -> int:
+    return persist(conn, fetch())

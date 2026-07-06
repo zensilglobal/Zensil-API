@@ -17,7 +17,8 @@ def enabled() -> bool:
     return settings.has_flipkart()
 
 
-def run(conn: psycopg.Connection) -> int:
+def fetch() -> list[dict]:
+    """Pull + transform. Holds NO DB conn (Neon drops idle sessions)."""
     headers = flipkart.auth_headers()
     today = dt.date.today().isoformat()
     rows: list[dict] = []
@@ -34,5 +35,12 @@ def run(conn: psycopg.Connection) -> int:
                 "available_qty": listing.get("availableQuantity", 0),
                 "inbound_qty": 0,
             })
+    return rows
 
+
+def persist(conn: psycopg.Connection, rows: list[dict]) -> int:
     return upsert(conn, "inventory", rows, conflict_keys=["channel", "internal_sku", "snapshot_date"])
+
+
+def run(conn: psycopg.Connection) -> int:
+    return persist(conn, fetch())

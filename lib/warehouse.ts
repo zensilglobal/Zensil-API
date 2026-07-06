@@ -14,6 +14,7 @@ import {
   ProductRow,
   Decision,
   Channel,
+  SyncStatus,
 } from "./types";
 import { inr, inrK, num, pct, deltaPct } from "./format";
 
@@ -333,4 +334,24 @@ export async function decisions(f: Filter): Promise<Decision[]> {
 
 export async function decisionCount(): Promise<number> {
   return (await decisions({ channel: "all", days: 30 })).length;
+}
+
+function ago(d: Date): string {
+  const mins = Math.floor((Date.now() - d.getTime()) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+export async function syncStatus(): Promise<SyncStatus | null> {
+  const rows = await q<{ last_synced_at: string | null; last_status: string | null }>(
+    `SELECT last_synced_at, last_status FROM sync_state WHERE last_synced_at IS NOT NULL`,
+  );
+  if (!rows.length) return null;
+  const latest = new Date(Math.max(...rows.map((r) => new Date(r.last_synced_at!).getTime())));
+  const anyError = rows.some((r) => r.last_status && r.last_status !== "ok");
+  const stale = Date.now() - latest.getTime() > 6 * 3_600_000; // ETL runs every 3h
+  return { label: ago(latest), ok: !anyError && !stale };
 }

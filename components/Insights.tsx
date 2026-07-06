@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Sparkles, Send } from "lucide-react";
+import { Sparkles, Send, ShieldCheck, Database, ArrowUpRight } from "lucide-react";
 
 interface Msg {
   role: "you" | "claude";
   html: string;
+  model?: string;
   loading?: boolean;
 }
 
@@ -18,10 +19,36 @@ const SUGGESTIONS = [
 ];
 
 const CARDS = [
-  { tag: "Stockout Risk", title: "3 SKUs stock out within 7 days", body: "Gilded Soy Candle Trio, Obsidian Leather Journal and Heritage Brass Stand fall below 7 days of cover at current velocity.", ev: "SELECT internal_sku FROM v_stock_health WHERE days_of_cover < 7" },
-  { tag: "Wasted Spend", title: "₹7,640 recoverable on Amazon", body: "Six search terms over ₹500 spend produced zero or near-zero orders. Adding them as negatives reclaims spend immediately.", ev: "SELECT keyword_or_search_term, spend FROM v_wasted_spend" },
-  { tag: "Return Spike", title: "Silk Scarf returns trending up", body: "Crimson Silk Scarf shows the highest return rate, driven by \"damaged in transit\". Review packaging before scaling ads.", ev: "SELECT reason, count(*) FROM returns GROUP BY reason ORDER BY 2 DESC" },
+  {
+    tag: "Stockout Risk",
+    title: "3 SKUs stock out within 7 days",
+    body: "Gilded Soy Candle Trio, Obsidian Leather Journal and Heritage Brass Stand fall below 7 days of cover at current velocity.",
+    ev: "SELECT internal_sku FROM v_stock_health WHERE days_of_cover < 7",
+    q: "Which SKUs stock out within 7 days and how many units should I reorder for each?",
+  },
+  {
+    tag: "Wasted Spend",
+    title: "₹7,640 recoverable on Amazon",
+    body: "Six search terms over ₹500 spend produced zero or near-zero orders. Adding them as negatives reclaims spend immediately.",
+    ev: "SELECT keyword_or_search_term, spend FROM v_wasted_spend",
+    q: "Which search terms should I add as negative keywords and how much will it save?",
+  },
+  {
+    tag: "Return Spike",
+    title: "Silk Scarf returns trending up",
+    body: 'Crimson Silk Scarf shows the highest return rate, driven by "damaged in transit". Review packaging before scaling ads.',
+    ev: "SELECT reason, count(*) FROM returns GROUP BY reason ORDER BY 2 DESC",
+    q: "Break down returns for the Crimson Silk Scarf by reason and suggest fixes.",
+  },
 ];
+
+function modelLabel(model?: string): string {
+  if (!model || model === "sample") return "Sample data";
+  if (model.startsWith("claude-opus-4-8")) return "Opus 4.8";
+  if (model.startsWith("claude-opus")) return "Opus";
+  if (model.startsWith("claude-sonnet")) return "Sonnet";
+  return "Claude";
+}
 
 export default function Insights() {
   const searchParams = useSearchParams();
@@ -38,12 +65,20 @@ export default function Insights() {
       const res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({
+          question: q,
+          channel: searchParams.get("channel") || "all",
+          days: Number(searchParams.get("days")) || 30,
+        }),
       });
       const data = await res.json();
       setMessages((m) => {
         const copy = [...m];
-        copy[copy.length - 1] = { role: "claude", html: data.answer ?? "Something went wrong." };
+        copy[copy.length - 1] = {
+          role: "claude",
+          html: data.answer ?? "Something went wrong.",
+          model: data.model,
+        };
         return copy;
       });
     } catch {
@@ -62,6 +97,7 @@ export default function Insights() {
       askedRef.current = q;
       ask(q);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => {
@@ -70,47 +106,75 @@ export default function Insights() {
 
   return (
     <>
-      <div className="card">
-        <div className="card-b">
-          <form
-            className="ask"
-            onSubmit={(e) => {
-              e.preventDefault();
-              ask(input);
-              setInput("");
-            }}
-          >
-            <Sparkles size={18} color="var(--color-gold)" />
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything about your warehouse — e.g. which SKU has the worst margin on Flipkart?"
-            />
-            <button type="submit" className="btn gold">
-              <Send size={15} /> Ask
-            </button>
-          </form>
-          <div className="suggested">
-            {SUGGESTIONS.map((s) => (
-              <button key={s} onClick={() => ask(s)}>
-                {s}
-              </button>
-            ))}
+      <div className="ask-shell">
+        <div className="ask-shell-glow" />
+        <div className="ask-head">
+          <div className="ask-crest">
+            <Sparkles size={16} />
           </div>
+          <div>
+            <div className="ask-title">Ask Claude anything about your business</div>
+            <div className="ask-meta">
+              <span>
+                <ShieldCheck size={12} /> Read-only
+              </span>
+              <span>
+                <Database size={12} /> Grounded on your live warehouse
+              </span>
+              <span className="ask-model">
+                <Sparkles size={11} /> Opus 4.8
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <form
+          className="ask"
+          onSubmit={(e) => {
+            e.preventDefault();
+            ask(input);
+            setInput("");
+          }}
+        >
+          <Sparkles size={18} color="var(--color-gold)" />
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="e.g. which SKU has the worst margin on Flipkart, and what should I do about it?"
+          />
+          <button type="submit" className="btn gold">
+            <Send size={15} /> Ask
+          </button>
+        </form>
+
+        <div className="suggested">
+          {SUGGESTIONS.map((s) => (
+            <button key={s} onClick={() => ask(s)}>
+              {s}
+            </button>
+          ))}
         </div>
       </div>
 
       {messages.length === 0 && (
-        <div className="grid g-3 mt">
-          {CARDS.map((c) => (
-            <div key={c.title} className="insight-card">
-              <div className="tag">{c.tag}</div>
-              <h4>{c.title}</h4>
-              <p>{c.body}</p>
-              <div className="ev">{c.ev}</div>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="insight-lead">
+            <span>Surfaced now</span> — tap a card to open the full analysis
+          </div>
+          <div className="grid g-3 mt">
+            {CARDS.map((c) => (
+              <button key={c.title} className="insight-card" onClick={() => ask(c.q)}>
+                <div className="insight-card-top">
+                  <span className="tag">{c.tag}</span>
+                  <ArrowUpRight size={16} className="insight-arrow" />
+                </div>
+                <h4>{c.title}</h4>
+                <p>{c.body}</p>
+                <div className="ev">{c.ev}</div>
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       <div className="chat-thread">
@@ -120,13 +184,23 @@ export default function Insights() {
           ) : (
             <div key={i} className="bubble claude">
               <div className="who">
-                <Sparkles size={13} /> Claude · Zensil Ops
+                <span className="who-crest">
+                  <Sparkles size={12} />
+                </span>
+                Claude · Zensil Ops
+                <span className={`who-model ${m.model === "sample" ? "sample" : ""}`}>{modelLabel(m.model)}</span>
               </div>
               {m.loading ? (
-                <div className="typing">
-                  <i />
-                  <i />
-                  <i />
+                <div className="thinking">
+                  <div className="thinking-row">
+                    <span className="orbit" />
+                    Reading your warehouse & reasoning over the numbers…
+                  </div>
+                  <div className="skeleton">
+                    <i style={{ width: "92%" }} />
+                    <i style={{ width: "78%" }} />
+                    <i style={{ width: "85%" }} />
+                  </div>
                 </div>
               ) : (
                 <div dangerouslySetInnerHTML={{ __html: m.html }} />

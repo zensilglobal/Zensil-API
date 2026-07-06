@@ -12,7 +12,7 @@ import {
   Sparkles,
   Menu,
 } from "lucide-react";
-import { ChannelFilter, RangeDays } from "@/lib/types";
+import { ChannelFilter, RangeDays, SyncStatus } from "@/lib/types";
 
 const NAV = [
   { href: "/", label: "Overview", icon: LayoutGrid, group: "Command" },
@@ -45,9 +45,11 @@ const RANGES: RangeDays[] = [7, 30, 90];
 export default function AppFrame({
   children,
   badges,
+  sync,
 }: {
   children: React.ReactNode;
   badges: Record<string, number>;
+  sync: SyncStatus | null;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -109,7 +111,8 @@ export default function AppFrame({
         </nav>
         <div className="sidebar-foot">
           <div className="sync-pill">
-            <span className="dot" /> Warehouse synced · just now
+            <span className="dot" style={sync && !sync.ok ? { background: "var(--color-gold-soft)" } : undefined} />{" "}
+            {sync ? `Warehouse synced · ${sync.label}` : "Sample data"}
           </div>
           <div className="flex between" style={{ marginTop: 4 }}>
             <span className="tiny muted">Amazon · Flipkart · Shopify</span>

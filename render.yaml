@@ -5,10 +5,10 @@ services:
   - type: web
     name: zensil-web
     runtime: docker
-    plan: free # spins down after ~15 min idle; switch to "starter" for always-on
+    plan: starter # always-on; "free" spins down after ~15 min idle (cold-start 502s)
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /login # returns 200 without a session (/ redirects to it)
+    healthCheckPath: /api/health # 200 only when the app AND warehouse conn are good
     autoDeploy: true # redeploy on every push to main
     envVars:
       # standalone server.js binds to $HOSTNAME; without this the container's
