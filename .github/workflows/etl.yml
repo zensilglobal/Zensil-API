@@ -2,7 +2,7 @@ name: ETL pipelines
 
 on:
   schedule:
-    - cron: "0 */3 * * *" # every 3 hours (orders/inventory cadence, PRD §10.1)
+    - cron: "26 */3 * * *" # every 3h, offset minute (on-the-hour crons get skipped)
   workflow_dispatch: {} # manual trigger
 
 concurrency:

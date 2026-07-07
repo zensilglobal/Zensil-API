@@ -93,7 +93,11 @@ def fetch() -> tuple[list[dict], list[dict]]:
             if state == "DONE":
                 document_id = body["reportDocumentId"]
                 break
-            if state in ("CANCELLED", "FATAL"):
+            if state == "CANCELLED":
+                # Amazon cancels duplicate requests when nothing changed since
+                # the last report — keep the previous data, don't fail.
+                return [], []
+            if state == "FATAL":
                 raise RuntimeError(f"Amazon report {report_id} ended: {state}")
             time.sleep(10)
         if not document_id:

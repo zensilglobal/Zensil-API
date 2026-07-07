@@ -6,7 +6,9 @@ name: ETL fast lane (orders)
 # best-effort — expect occasional 5-15 min drift at busy times.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # offset minutes — on-the-dot crons (:00/:10/:20) are the most congested
+    # and get skipped; this lane is best-effort backup for the Render cron.
+    - cron: "4,14,24,34,44,54 * * * *"
   workflow_dispatch: {}
 
 concurrency:

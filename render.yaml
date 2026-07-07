@@ -1,6 +1,23 @@
-# Render Blueprint — deploys the dashboard from this repo's Dockerfile.
+# Render Blueprint — dashboard (web) + ETL cron jobs.
 # In Render: New → Blueprint → select this repo, then fill the sync:false
-# env vars when prompted. The ETL stays on GitHub Actions (.github/workflows/etl.yml).
+# env vars when prompted. GitHub Actions (.github/workflows/etl*.yml) stays
+# as a free best-effort backup, but Render crons are the reliable schedule —
+# GitHub skipped most scheduled runs (3 fired in 24h on a */10 cron).
+envVarGroups:
+  # Shared by both ETL crons — paste the values from etl/.env once.
+  - name: etl-secrets
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Neon pooled connection string
+      - key: SPAPI_CLIENT_ID
+        sync: false
+      - key: SPAPI_CLIENT_SECRET
+        sync: false
+      - key: SPAPI_REFRESH_TOKEN
+        sync: false
+      - key: ALERT_WEBHOOK_URL
+        sync: false # optional — Slack/Discord webhook for pipeline failures
+
 services:
   - type: web
     name: zensil-web
@@ -27,3 +44,31 @@ services:
         sync: false # Neon pooled connection string
       - key: ANTHROPIC_API_KEY
         sync: false # optional — leave blank until /api/claude goes live
+
+  # Near-real-time orders: last day of Amazon orders, every 10 minutes (~40s).
+  - type: cron
+    name: zensil-etl-orders
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./etl/Dockerfile
+    dockerContext: ./etl
+    schedule: "*/10 * * * *"
+    dockerCommand: python -m etl.run_all --only amazon_orders
+    autoDeploy: true
+    envVars:
+      - fromGroup: etl-secrets
+      - key: AMAZON_ORDERS_LOOKBACK_DAYS
+        value: "1"
+
+  # Inventory + returns reports every 30 minutes (async report generation).
+  - type: cron
+    name: zensil-etl-reports
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./etl/Dockerfile
+    dockerContext: ./etl
+    schedule: "7,37 * * * *"
+    dockerCommand: python -m etl.run_all --only amazon_inventory,amazon_returns
+    autoDeploy: true
+    envVars:
+      - fromGroup: etl-secrets
