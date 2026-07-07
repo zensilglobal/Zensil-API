@@ -1,6 +1,7 @@
 """Postgres connection + a generic idempotent upsert helper (PRD §9)."""
 from __future__ import annotations
 
+import time
 from collections.abc import Iterable, Sequence
 from contextlib import contextmanager
 from typing import Any
@@ -10,18 +11,32 @@ import psycopg
 from etl.settings import settings
 
 
+def _connect(retries: int = 3) -> psycopg.Connection:
+    """Neon's compute may be cold on the first connect — retry briefly."""
+    last: Exception | None = None
+    for attempt in range(retries):
+        try:
+            return psycopg.connect(
+                settings.database_url,
+                autocommit=False,
+                connect_timeout=30,
+                keepalives=1,
+                keepalives_idle=30,
+                keepalives_interval=10,
+                keepalives_count=5,
+            )
+        except psycopg.OperationalError as exc:
+            last = exc
+            if attempt < retries - 1:
+                time.sleep(3)
+    raise RuntimeError(f"could not connect to the warehouse after {retries} attempts: {last!r}")
+
+
 @contextmanager
 def get_conn():
     if not settings.database_url:
         raise RuntimeError("DATABASE_URL is not set — cannot connect to the warehouse.")
-    conn = psycopg.connect(
-        settings.database_url,
-        autocommit=False,
-        keepalives=1,
-        keepalives_idle=30,
-        keepalives_interval=10,
-        keepalives_count=5,
-    )
+    conn = _connect()
     try:
         yield conn
         conn.commit()

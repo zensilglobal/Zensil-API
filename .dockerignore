@@ -6,7 +6,9 @@ node_modules
 .env
 .env.local
 *.env
-etl
+**/.env
+**/__pycache__
+etl/tests
 supabase
 prototype
 docker-compose.yml

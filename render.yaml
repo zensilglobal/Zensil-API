@@ -1,10 +1,10 @@
-# Render Blueprint — dashboard (web) + ETL cron jobs.
-# In Render: New → Blueprint → select this repo, then fill the sync:false
-# env vars when prompted. GitHub Actions (.github/workflows/etl*.yml) stays
-# as a free best-effort backup, but Render crons are the reliable schedule —
-# GitHub skipped most scheduled runs (3 fired in 24h on a */10 cron).
+# Render Blueprint — the always-on dashboard also runs the warehouse sync
+# in-process (instrumentation.ts spawns the bundled Python etl package on a
+# timer: orders every 10 min, inventory+returns every 30 min). External cron
+# schedulers proved unreliable: GitHub Actions skipped ~95% of scheduled fires
+# and Render cron stalled after one run. GitHub workflows remain as backup.
 envVarGroups:
-  # Shared by both ETL crons — paste the values from etl/.env once.
+  # SP-API credentials for the in-process ETL — paste values from etl/.env.
   - name: etl-secrets
     envVars:
       - key: DATABASE_URL
@@ -22,18 +22,21 @@ services:
   - type: web
     name: zensil-web
     runtime: docker
-    plan: starter # always-on; "free" spins down after ~15 min idle (cold-start 502s)
+    plan: starter # always-on — required: this service IS the ETL scheduler
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/health # 200 only when the app AND warehouse conn are good
     autoDeploy: true # redeploy on every push to main
     envVars:
+      - fromGroup: etl-secrets
       # standalone server.js binds to $HOSTNAME; without this the container's
       # own hostname wins and Render's proxy can't reach the app (502)
       - key: HOSTNAME
         value: 0.0.0.0
       - key: PORT
         value: "3000"
+      - key: ETL_INLINE
+        value: "1" # enable the in-process sync scheduler
       - key: APP_AUTH_EMAIL
         value: office@zensil.in
       - key: APP_AUTH_PASSWORD
@@ -44,31 +47,3 @@ services:
         sync: false # Neon pooled connection string
       - key: ANTHROPIC_API_KEY
         sync: false # optional — leave blank until /api/claude goes live
-
-  # Near-real-time orders: last day of Amazon orders, every 10 minutes (~40s).
-  - type: cron
-    name: zensil-etl-orders
-    runtime: docker
-    plan: starter
-    dockerfilePath: ./etl/Dockerfile
-    dockerContext: ./etl
-    schedule: "*/10 * * * *"
-    dockerCommand: python -m etl.run_all --only amazon_orders
-    autoDeploy: true
-    envVars:
-      - fromGroup: etl-secrets
-      - key: AMAZON_ORDERS_LOOKBACK_DAYS
-        value: "1"
-
-  # Inventory + returns reports every 30 minutes (async report generation).
-  - type: cron
-    name: zensil-etl-reports
-    runtime: docker
-    plan: starter
-    dockerfilePath: ./etl/Dockerfile
-    dockerContext: ./etl
-    schedule: "7,37 * * * *"
-    dockerCommand: python -m etl.run_all --only amazon_inventory,amazon_returns
-    autoDeploy: true
-    envVars:
-      - fromGroup: etl-secrets
