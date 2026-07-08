@@ -10,6 +10,7 @@ import {
   CampaignRow,
   WastedRow,
   ReturnRow,
+  ReturnLineRow,
   ReturnReason,
   TopProduct,
   ProductRow,
@@ -327,11 +328,13 @@ export function getInventoryKpis(f: Filter): Kpi[] {
   const crit = rows.filter((r) => r.status === "critical").length;
   const low = rows.filter((r) => r.status === "low").length;
   const totalUnits = rows.reduce((a, r) => a + r.stock, 0);
+  const qs = buildQuery(f);
+  const and = qs ? "&" : "?";
   return [
-    { label: "SKUs Tracked", value: num(rows.length), sub: "live snapshot" },
-    { label: "Critical", value: `<span style="color:var(--color-crimson-bright)">${crit}</span>`, sub: "< 7 days cover" },
-    { label: "Low Stock", value: `<span style="color:var(--color-gold-soft)">${low}</span>`, sub: "< 14 days cover" },
-    { label: "Units On Hand", value: num(totalUnits), sub: "total inventory" },
+    { label: "SKUs Tracked", value: num(rows.length), sub: "live snapshot", href: `/drilldown/stock${qs}` },
+    { label: "Critical", value: `<span style="color:var(--color-crimson-bright)">${crit}</span>`, sub: "< 7 days cover", href: `/drilldown/stock${qs}${and}status=critical` },
+    { label: "Low Stock", value: `<span style="color:var(--color-gold-soft)">${low}</span>`, sub: "< 14 days cover", href: `/drilldown/stock${qs}${and}status=low` },
+    { label: "Units On Hand", value: num(totalUnits), sub: "total inventory", href: `/drilldown/stock${qs}` },
   ];
 }
 
@@ -374,12 +377,38 @@ export function getReturnsKpis(f: Filter): Kpi[] {
   const accountRate = sold ? (returned / sold) * 100 : 0;
   const topByUnits = [...data].sort((a, b) => b.units - a.units)[0];
   const worst = data.filter((d) => d.sold >= 3)[0];
+  const qs = buildQuery(f);
+  const and = qs ? "&" : "?";
   return [
-    { label: "Account Return Rate", value: sold ? pct(accountRate) : "—", sub: `${num(returned)} of ${num(sold)} units sold` },
-    { label: "Units Returned", value: num(returned), sub: `last ${f.days} days` },
-    { label: "Top SKU Returns", value: topByUnits ? num(topByUnits.units) : "—", sub: topByUnits?.sku || "no returns in window" },
-    { label: "Highest Return Rate", value: worst ? worst.rate.toFixed(1) + "%" : "—", sub: worst ? `${worst.sku} · ≥3 sold` : "no SKU with ≥3 sold" },
+    { label: "Account Return Rate", value: sold ? pct(accountRate) : "—", sub: `${num(returned)} of ${num(sold)} units sold`, href: `/drilldown/returns${qs}` },
+    { label: "Units Returned", value: num(returned), sub: `last ${f.days} days`, href: `/drilldown/returns${qs}` },
+    { label: "Top SKU Returns", value: topByUnits ? num(topByUnits.units) : "—", sub: topByUnits?.sku || "no returns in window", href: topByUnits ? `/drilldown/returns${qs}${and}q=${encodeURIComponent(topByUnits.sku)}` : `/drilldown/returns${qs}` },
+    { label: "Highest Return Rate", value: worst ? worst.rate.toFixed(1) + "%" : "—", sub: worst ? `${worst.sku} · ≥3 sold` : "no SKU with ≥3 sold", href: worst ? `/drilldown/returns${qs}${and}q=${encodeURIComponent(worst.sku)}` : `/drilldown/returns${qs}` },
   ];
+}
+
+export function getReturnLines(f: Filter): ReturnLineRow[] {
+  // synthesize deterministic per-unit return events from the SKU aggregates
+  const out: ReturnLineRow[] = [];
+  const chans: Channel[] = ["amazon", "flipkart", "shopify"];
+  getReturns(f).forEach((r) => {
+    for (let i = 0; i < r.units; i++) {
+      const date = new Date(BASE);
+      date.setUTCDate(BASE.getUTCDate() - ((i * 7 + Math.floor(rndStable(r.sku) * 10)) % f.days));
+      const reason = returnReasons[Math.floor(rndStable(r.sku + i) * returnReasons.length)].reason;
+      const chan = f.channel === "all" ? chans[Math.floor(rndStable(r.sku + "c" + i) * chans.length)] : f.channel;
+      out.push({
+        id: `${r.sku}-R${String(i + 1).padStart(3, "0")}`,
+        channel: chan,
+        date: date.toISOString(),
+        sku: r.sku,
+        name: r.name,
+        qty: 1,
+        reason,
+      });
+    }
+  });
+  return out.sort((a, b) => +new Date(b.date) - +new Date(a.date));
 }
 export const getReturnReasons = (): ReturnReason[] => returnReasons;
 

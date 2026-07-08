@@ -33,6 +33,7 @@ export const getWasted = () => (live ? wh.wasted() : Promise.resolve(mock.getWas
 export const getReturns = (f: Filter) => (live ? wh.returns(f) : Promise.resolve(mock.getReturns(f)));
 export const getReturnsKpis = (f: Filter) => (live ? wh.returnsKpis(f) : Promise.resolve(mock.getReturnsKpis(f)));
 export const getReturnReasons = (f: Filter) => (live ? wh.returnReasons(f) : Promise.resolve(mock.getReturnReasons()));
+export const getReturnLines = (f: Filter) => (live ? wh.returnLines(f) : Promise.resolve(mock.getReturnLines(f)));
 
 export const getProducts = () => (live ? wh.products() : Promise.resolve(mock.getProducts()));
 export const decisionCount = () => (live ? wh.decisionCount() : Promise.resolve(mock.decisionCount()));

@@ -14,7 +14,9 @@ import type { Channel } from "@/lib/types";
   the same component serves revenue, orders, AOV and ACOS drill-downs.
 */
 
-export type CellKind = "text" | "money" | "int" | "pct" | "channel" | "status" | "date";
+export type CellKind = "text" | "money" | "int" | "float" | "pct" | "channel" | "status" | "date";
+
+const NUMERIC: CellKind[] = ["money", "int", "float", "pct"];
 
 export interface DrillCol {
   key: string;
@@ -37,6 +39,7 @@ function fmt(v: string | number, kind: CellKind): string {
   switch (kind) {
     case "money": return inr(Number(v));
     case "int": return num(Number(v));
+    case "float": return Number(v).toFixed(1);
     case "pct": return Number(v).toFixed(1) + "%";
     case "date": return dayLabel(String(v));
     case "channel": return channelName(String(v));
@@ -45,7 +48,7 @@ function fmt(v: string | number, kind: CellKind): string {
 }
 
 function csvValue(v: string | number, kind: CellKind): string | number {
-  if (kind === "money" || kind === "pct") return Math.round(Number(v) * 100) / 100;
+  if (kind === "money" || kind === "pct" || kind === "float") return Math.round(Number(v) * 100) / 100;
   if (kind === "int") return Number(v);
   if (kind === "date") return String(v).slice(0, 10);
   if (kind === "channel") return channelName(String(v));
@@ -57,14 +60,20 @@ export default function DrilldownTable({
   cols,
   filename,
   initialSort,
+  initialSearch = "",
+  initialPicks,
 }: {
   rows: Row[];
   cols: DrillCol[];
   filename: string; // base name, no extension
   initialSort?: { key: string; dir: SortDir };
+  /** pre-fill the free-text search (e.g. deep link to one SKU) */
+  initialSearch?: string;
+  /** pre-select column filters (e.g. { status: "critical" }) */
+  initialPicks?: Record<string, string>;
 }) {
-  const [qText, setQText] = useState("");
-  const [picks, setPicks] = useState<Record<string, string>>({});
+  const [qText, setQText] = useState(initialSearch);
+  const [picks, setPicks] = useState<Record<string, string>>(initialPicks ?? {});
   const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(initialSort ?? null);
   const [showAll, setShowAll] = useState(false);
 
@@ -82,7 +91,7 @@ export default function DrilldownTable({
     }
     if (sort) {
       const col = cols.find((c) => c.key === sort.key);
-      const numeric = col && (col.kind === "money" || col.kind === "int" || col.kind === "pct");
+      const numeric = col && NUMERIC.includes(col.kind || "text");
       out = [...out].sort((a, b) => {
         const av = a[sort.key], bv = b[sort.key];
         const cmp = numeric ? Number(av) - Number(bv) : String(av).localeCompare(String(bv));
@@ -120,7 +129,7 @@ export default function DrilldownTable({
     return [...new Set(rows.map((r) => String(r[key])))].sort();
   }
 
-  const align = (c: DrillCol) => (c.kind === "money" || c.kind === "int" || c.kind === "pct" ? "right" : undefined);
+  const align = (c: DrillCol) => (NUMERIC.includes(c.kind || "text") ? "right" : undefined);
 
   return (
     <div>
@@ -197,7 +206,7 @@ export default function DrilldownTable({
                         <StatusPill status={String(r[c.key])} />
                       </td>
                     );
-                  const numeric = kind === "money" || kind === "int" || kind === "pct";
+                  const numeric = NUMERIC.includes(kind);
                   return (
                     <td
                       key={c.key}

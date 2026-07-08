@@ -103,6 +103,17 @@ export interface ReturnRow {
   sold: number;
 }
 
+/** Returns drill-down: one row per individual return event. */
+export interface ReturnLineRow {
+  id: string;
+  channel: Channel;
+  date: string; // ISO date
+  sku: string;
+  name: string;
+  qty: number;
+  reason: string;
+}
+
 export interface TopProduct {
   name: string;
   value: number;

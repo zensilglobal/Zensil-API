@@ -12,6 +12,7 @@ import {
   CampaignRow,
   WastedRow,
   ReturnRow,
+  ReturnLineRow,
   ReturnReason,
   TopProduct,
   ProductRow,
@@ -254,11 +255,13 @@ export async function inventoryKpis(f: Filter): Promise<Kpi[]> {
   const crit = rows.filter((r) => r.status === "critical").length;
   const low = rows.filter((r) => r.status === "low").length;
   const total = rows.reduce((a, r) => a + r.stock, 0);
+  const qs = buildQuery(f);
+  const and = qs ? "&" : "?";
   return [
-    { label: "SKUs Tracked", value: num(rows.length), sub: "live snapshot" },
-    { label: "Critical", value: `<span style="color:var(--color-crimson-bright)">${crit}</span>`, sub: "< 7 days cover" },
-    { label: "Low Stock", value: `<span style="color:var(--color-gold-soft)">${low}</span>`, sub: "< 14 days cover" },
-    { label: "Units On Hand", value: num(total), sub: "total inventory" },
+    { label: "SKUs Tracked", value: num(rows.length), sub: "live snapshot", href: `/drilldown/stock${qs}` },
+    { label: "Critical", value: `<span style="color:var(--color-crimson-bright)">${crit}</span>`, sub: "< 7 days cover", href: `/drilldown/stock${qs}${and}status=critical` },
+    { label: "Low Stock", value: `<span style="color:var(--color-gold-soft)">${low}</span>`, sub: "< 14 days cover", href: `/drilldown/stock${qs}${and}status=low` },
+    { label: "Units On Hand", value: num(total), sub: "total inventory", href: `/drilldown/stock${qs}` },
   ];
 }
 
@@ -359,12 +362,36 @@ export async function returnsKpis(f: Filter): Promise<Kpi[]> {
   const topByUnits = [...data].sort((a, b) => b.units - a.units)[0];
   const worst = data.filter((d) => d.sold >= RATE_MIN_SOLD)[0];
   const reasons = await returnReasons(f);
+  const qs = buildQuery(f);
+  const and = qs ? "&" : "?";
   return [
-    { label: "Account Return Rate", value: sold ? pct(accountRate) : "—", sub: `${num(returned)} of ${num(sold)} units sold` },
-    { label: "Units Returned", value: num(returned), sub: `last ${f.days} days` },
-    { label: "Top SKU Returns", value: topByUnits ? num(topByUnits.units) : "—", sub: topByUnits ? topByUnits.sku : "no returns in window" },
-    { label: "Highest Return Rate", value: worst ? worst.rate.toFixed(1) + "%" : "—", sub: worst ? `${worst.sku} · ≥${RATE_MIN_SOLD} sold` : `no SKU with ≥${RATE_MIN_SOLD} sold` },
+    { label: "Account Return Rate", value: sold ? pct(accountRate) : "—", sub: `${num(returned)} of ${num(sold)} units sold`, href: `/drilldown/returns${qs}` },
+    { label: "Units Returned", value: num(returned), sub: `last ${f.days} days`, href: `/drilldown/returns${qs}` },
+    { label: "Top SKU Returns", value: topByUnits ? num(topByUnits.units) : "—", sub: topByUnits ? topByUnits.sku : "no returns in window", href: topByUnits ? `/drilldown/returns${qs}${and}q=${encodeURIComponent(topByUnits.sku)}` : `/drilldown/returns${qs}` },
+    { label: "Highest Return Rate", value: worst ? worst.rate.toFixed(1) + "%" : "—", sub: worst ? `${worst.sku} · ≥${RATE_MIN_SOLD} sold` : `no SKU with ≥${RATE_MIN_SOLD} sold`, href: worst ? `/drilldown/returns${qs}${and}q=${encodeURIComponent(worst.sku)}` : `/drilldown/returns${qs}` },
   ];
+}
+
+/** Returns drill-down: every individual return event in the window. */
+export async function returnLines(f: Filter, limit = 2000): Promise<ReturnLineRow[]> {
+  const { clause, params } = ch(f);
+  const rows = await q<{ id: string; channel: Channel; date: string; sku: string; name: string | null; qty: string; reason: string | null }>(
+    `SELECT r.return_id id, r.channel, r.return_date date, r.internal_sku sku,
+       sm.product_name name, r.qty, r.reason
+     FROM returns r LEFT JOIN sku_master sm ON sm.internal_sku = r.internal_sku
+     WHERE r.return_date >= (now()-make_interval(days => $1::int))::date ${clause.replace("channel", "r.channel")}
+     ORDER BY r.return_date DESC LIMIT ${Number(limit)}`,
+    [f.days, ...params],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    channel: r.channel,
+    date: new Date(r.date).toISOString(),
+    sku: r.sku,
+    name: r.name || r.sku,
+    qty: +r.qty,
+    reason: r.reason || "Unspecified",
+  }));
 }
 
 export async function returnReasons(f: Filter): Promise<ReturnReason[]> {

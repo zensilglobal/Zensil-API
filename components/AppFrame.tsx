@@ -36,6 +36,8 @@ const TITLES: Record<string, { t: string; s: string }> = {
   "/drilldown/orders": { t: "Orders — Detail", s: "Every order line in the window, SKU-wise" },
   "/drilldown/aov": { t: "Avg Order Value — Detail", s: "The per-order values behind the average" },
   "/drilldown/acos": { t: "Blended ACOS — Detail", s: "Campaign spend, attributed sales & wasted terms" },
+  "/drilldown/stock": { t: "Inventory — Detail", s: "FBA vs Easy Ship units, cover & status per SKU" },
+  "/drilldown/returns": { t: "Returns — Detail", s: "SKU-wise rates and every individual return event" },
 };
 
 const CHANNELS: { id: ChannelFilter; label: string; color?: string }[] = [

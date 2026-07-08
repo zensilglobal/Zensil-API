@@ -9,6 +9,11 @@ import {
   getCampaigns,
   getWasted,
   adChannelAvailable,
+  getInventoryKpis,
+  getStockHealth,
+  getReturnsKpis,
+  getReturns,
+  getReturnLines,
 } from "@/lib/queries";
 import { inr, inrK, num } from "@/lib/format";
 import { Filter, OrderLineRow } from "@/lib/types";
@@ -16,18 +21,28 @@ import { KpiGrid, Card } from "@/components/ui";
 import DrilldownTable, { DrillCol } from "@/components/DrilldownTable";
 
 /*
-  Drill-down behind each Overview KPI card. Server component fetches the
-  full row set for the active window (global channel/period filters apply),
+  Drill-down behind the KPI cards. Server component fetches the full row
+  set for the active window (global channel/period filters apply),
   DrilldownTable adds search / column filters / sort / CSV export.
 */
 
-const METRICS = ["revenue", "orders", "aov", "acos"] as const;
+const METRICS = ["revenue", "orders", "aov", "acos", "stock", "returns"] as const;
 type Metric = (typeof METRICS)[number];
 
-function BackLink({ f }: { f: Filter }) {
+const BACK: Record<Metric, { href: string; label: string }> = {
+  revenue: { href: "/", label: "Back to Overview" },
+  orders: { href: "/", label: "Back to Overview" },
+  aov: { href: "/", label: "Back to Overview" },
+  acos: { href: "/", label: "Back to Overview" },
+  stock: { href: "/inventory", label: "Back to Inventory" },
+  returns: { href: "/returns", label: "Back to Returns" },
+};
+
+function BackLink({ f, metric }: { f: Filter; metric: Metric }) {
+  const b = BACK[metric];
   return (
-    <Link className="btn ghost" href={`/${buildQuery(f)}`} style={{ marginBottom: 18 }}>
-      <ArrowLeft size={15} /> Back to Overview
+    <Link className="btn ghost" href={`${b.href}${buildQuery(f)}`} style={{ marginBottom: 18 }}>
+      <ArrowLeft size={15} /> {b.label}
     </Link>
   );
 }
@@ -217,6 +232,85 @@ async function AcosDrill({ f }: { f: Filter }) {
   );
 }
 
+async function StockDrill({ f, status }: { f: Filter; status?: string }) {
+  const [kpis, rows] = await Promise.all([getInventoryKpis(f), getStockHealth(f)]);
+  const cols: DrillCol[] = [
+    { key: "sku", label: "SKU" },
+    { key: "name", label: "Product", strong: true },
+    { key: "fba", label: "FBA On Hand", kind: "int", total: true },
+    { key: "easyShip", label: "Easy Ship On Hand", kind: "int", total: true },
+    { key: "stock", label: "Total On Hand", kind: "int", total: true },
+    { key: "velocity", label: "Velocity/Day", kind: "float" },
+    { key: "cover", label: "Days Cover", kind: "int" },
+    { key: "status", label: "Status", kind: "status", filter: true },
+  ];
+  const data = rows.map((r) => ({ ...r, cover: Math.round(r.cover) }));
+  return (
+    <>
+      <KpiGrid kpis={kpis} />
+      <div className="mt">
+        <Card title="Stock Detail" sub="FBA vs Easy Ship units per SKU · days of cover at trailing-14-day velocity">
+          <DrilldownTable
+            rows={data as unknown as Record<string, string | number>[]}
+            cols={cols}
+            filename={`zensil-stock-${f.channel}`}
+            initialSort={{ key: "cover", dir: "asc" }}
+            initialPicks={status === "critical" || status === "low" || status === "healthy" ? { status } : undefined}
+          />
+        </Card>
+      </div>
+    </>
+  );
+}
+
+async function ReturnsDrill({ f, search }: { f: Filter; search?: string }) {
+  const [kpis, rows, lines] = await Promise.all([getReturnsKpis(f), getReturns(f), getReturnLines(f)]);
+  const skuCols: DrillCol[] = [
+    { key: "sku", label: "SKU" },
+    { key: "name", label: "Product", strong: true },
+    { key: "units", label: "Units Returned", kind: "int", total: true },
+    { key: "sold", label: "Units Sold", kind: "int", total: true },
+    { key: "rate", label: "Return Rate", kind: "pct" },
+    { key: "reason", label: "Top Reason", filter: true },
+  ];
+  const lineCols: DrillCol[] = [
+    { key: "id", label: "Return ID" },
+    { key: "date", label: "Date", kind: "date" },
+    { key: "channel", label: "Channel", kind: "channel", filter: true },
+    { key: "sku", label: "SKU" },
+    { key: "name", label: "Product", strong: true },
+    { key: "qty", label: "Units", kind: "int", total: true },
+    { key: "reason", label: "Reason", filter: true },
+  ];
+  return (
+    <>
+      <KpiGrid kpis={kpis} />
+      <div className="mt">
+        <Card title="SKU-wise Returns" sub={`Rate = returned ÷ sold in the same ${f.days}-day window`}>
+          <DrilldownTable
+            rows={rows as unknown as Record<string, string | number>[]}
+            cols={skuCols}
+            filename={`zensil-returns-sku-${f.channel}-${f.days}d`}
+            initialSort={{ key: "units", dir: "desc" }}
+            initialSearch={search}
+          />
+        </Card>
+      </div>
+      <div className="mt">
+        <Card title="Individual Returns" sub="Every return event in the window — date, channel & reason">
+          <DrilldownTable
+            rows={lines as unknown as Record<string, string | number>[]}
+            cols={lineCols}
+            filename={`zensil-returns-events-${f.channel}-${f.days}d`}
+            initialSort={{ key: "date", dir: "desc" }}
+            initialSearch={search}
+          />
+        </Card>
+      </div>
+    </>
+  );
+}
+
 export default async function DrilldownPage({
   params,
   searchParams,
@@ -226,15 +320,19 @@ export default async function DrilldownPage({
 }) {
   const { metric } = await params;
   if (!METRICS.includes(metric as Metric)) notFound();
-  const f = parseFilter(await searchParams);
+  const sp = await searchParams;
+  const f = parseFilter(sp);
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
   return (
     <>
-      <BackLink f={f} />
+      <BackLink f={f} metric={metric as Metric} />
       {metric === "revenue" && <RevenueDrill f={f} />}
       {metric === "orders" && <OrdersDrill f={f} />}
       {metric === "aov" && <AovDrill f={f} />}
       {metric === "acos" && <AcosDrill f={f} />}
+      {metric === "stock" && <StockDrill f={f} status={one(sp.status)} />}
+      {metric === "returns" && <ReturnsDrill f={f} search={one(sp.q)} />}
     </>
   );
 }
