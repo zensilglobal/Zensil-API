@@ -13,6 +13,7 @@ import {
   WastedRow,
   ReturnRow,
   ReturnReason,
+  TopProduct,
   ProductRow,
   Decision,
   Channel,
@@ -175,11 +176,12 @@ export async function salesKpis(f: Filter): Promise<Kpi[]> {
   const units = +row.units, prevUnits = +row.prev_units;
   const aov = ord ? rev / ord : 0, prevAov = prevOrd ? prevRev / prevOrd : 0;
   const split = await channelSplit(f);
+  const qs = buildQuery(f);
   return [
-    { label: "Revenue", value: inrK(rev), deltaPct: deltaPct(rev, prevRev), splitHtml: splitHtml(split) },
-    { label: "Orders", value: num(ord), deltaPct: deltaPct(ord, prevOrd), splitHtml: splitHtml(split) },
-    { label: "Units Sold", value: num(units), deltaPct: deltaPct(units, prevUnits), sub: "items" },
-    { label: "Avg Order Value", value: inr(aov), deltaPct: deltaPct(aov, prevAov), sub: "per order" },
+    { label: "Revenue", value: inrK(rev), deltaPct: deltaPct(rev, prevRev), splitHtml: splitHtml(split), href: `/drilldown/revenue${qs}` },
+    { label: "Orders", value: num(ord), deltaPct: deltaPct(ord, prevOrd), splitHtml: splitHtml(split), href: `/drilldown/orders${qs}` },
+    { label: "Units Sold", value: num(units), deltaPct: deltaPct(units, prevUnits), sub: "items", href: `/drilldown/revenue${qs}` },
+    { label: "Avg Order Value", value: inr(aov), deltaPct: deltaPct(aov, prevAov), sub: "per order", href: `/drilldown/aov${qs}` },
   ];
 }
 
@@ -216,23 +218,24 @@ export async function recentOrders(f: Filter, limit = 12): Promise<{ rows: Order
   };
 }
 
-export async function topProducts(f: Filter, limit = 5): Promise<{ name: string; value: number }[]> {
+export async function topProducts(f: Filter, limit = 5): Promise<TopProduct[]> {
   const { clause, params } = ch(f);
-  const rows = await q<{ name: string; value: string }>(
-    `SELECT sm.product_name name, coalesce(sum(oi.qty*oi.unit_price),0) value
+  const rows = await q<{ name: string; value: string; units: string }>(
+    `SELECT sm.product_name name, coalesce(sum(oi.qty*oi.unit_price),0) value, coalesce(sum(oi.qty),0) units
      FROM order_items oi JOIN orders o USING(channel,order_id) JOIN sku_master sm ON sm.internal_sku=oi.internal_sku
      WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}
      GROUP BY sm.product_name ORDER BY value DESC LIMIT ${Number(limit)}`,
     [f.days, ...params],
   );
-  return rows.map((r) => ({ name: r.name, value: +r.value }));
+  return rows.map((r) => ({ name: r.name, value: +r.value, units: +r.units, avgPrice: +r.units ? +r.value / +r.units : 0 }));
 }
 
 export async function stockHealth(f: Filter): Promise<StockRow[]> {
   const chCol = f.channel === "all" ? "" : " WHERE channel = $1";
   const params = f.channel === "all" ? [] : [f.channel];
-  const rows = await q<{ sku: string; name: string; stock: string; velocity: string }>(
-    `SELECT internal_sku sku, product_name name, sum(available_qty) stock, sum(velocity) velocity
+  const rows = await q<{ sku: string; name: string; stock: string; fba: string; easyship: string; velocity: string }>(
+    `SELECT internal_sku sku, product_name name, sum(available_qty) stock,
+       sum(fba_qty) fba, sum(easyship_qty) easyship, sum(velocity) velocity
      FROM v_stock_health ${chCol} GROUP BY internal_sku, product_name`,
     params,
   );
@@ -241,7 +244,7 @@ export async function stockHealth(f: Filter): Promise<StockRow[]> {
       const stock = +r.stock, velocity = +r.velocity;
       const cover = velocity ? stock / velocity : 999;
       const status: StockRow["status"] = cover < 7 ? "critical" : cover < 14 ? "low" : "healthy";
-      return { sku: r.sku, name: r.name, stock, velocity, cover, status };
+      return { sku: r.sku, name: r.name, stock, fba: +r.fba, easyShip: +r.easyship, velocity, cover, status };
     })
     .sort((a, b) => a.cover - b.cover);
 }
@@ -292,31 +295,85 @@ export async function wasted(): Promise<WastedRow[]> {
   return rows.map((r) => ({ term: r.term, spend: +r.spend, clicks: +r.clicks, orders: +r.orders }));
 }
 
-export async function returns(): Promise<ReturnRow[]> {
-  const rows = await q<{ sku: string; name: string; rate: string; units: string; reason: string }>(
-    `SELECT vr.internal_sku sku, vr.product_name name, coalesce(vr.return_rate_pct,0) rate, coalesce(vr.returned_units,0) units,
-       coalesce((SELECT reason FROM returns r WHERE r.internal_sku=vr.internal_sku GROUP BY reason ORDER BY count(*) DESC LIMIT 1),'—') reason
-     FROM v_return_rate vr WHERE vr.returned_units > 0 ORDER BY vr.return_rate_pct DESC NULLS LAST`,
+/**
+ * SKU-wise returns for the selected window & channel. Rate divides returned
+ * units by units SOLD IN THE SAME WINDOW — a matched-window rate, so the
+ * 7/30/90D toggle actually changes it. Top reason is quantity-weighted and
+ * windowed too.
+ */
+export async function returns(f: Filter): Promise<ReturnRow[]> {
+  const { clause, params } = ch(f);
+  const rows = await q<{ sku: string; name: string; units: string; sold: string; reason: string | null }>(
+    `WITH ret AS (
+       SELECT internal_sku, sum(qty) units
+       FROM returns WHERE return_date >= (now()-make_interval(days => $1::int))::date ${clause}
+       GROUP BY internal_sku
+     ), sold AS (
+       SELECT oi.internal_sku, sum(oi.qty) units
+       FROM order_items oi JOIN orders o USING(channel,order_id)
+       WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}
+       GROUP BY oi.internal_sku
+     ), reason AS (
+       SELECT DISTINCT ON (internal_sku) internal_sku, reason FROM (
+         SELECT internal_sku, coalesce(reason,'Unspecified') reason, sum(qty) n
+         FROM returns WHERE return_date >= (now()-make_interval(days => $1::int))::date ${clause}
+         GROUP BY internal_sku, coalesce(reason,'Unspecified')
+       ) x ORDER BY internal_sku, n DESC
+     )
+     SELECT r.internal_sku sku, sm.product_name name, r.units, coalesce(s.units,0) sold, re.reason
+     FROM ret r
+     JOIN sku_master sm ON sm.internal_sku = r.internal_sku
+     LEFT JOIN sold s ON s.internal_sku = r.internal_sku
+     LEFT JOIN reason re ON re.internal_sku = r.internal_sku`,
+    [f.days, ...params],
   );
-  return rows.map((r) => ({ sku: r.sku, name: r.name, rate: +r.rate, units: +r.units, reason: r.reason }));
+  return rows
+    .map((r) => ({
+      sku: r.sku,
+      name: r.name,
+      units: +r.units,
+      sold: +r.sold,
+      rate: +r.sold > 0 ? (+r.units / +r.sold) * 100 : 0,
+      reason: r.reason || "—",
+    }))
+    .sort((a, b) => b.rate - a.rate);
 }
 
-export async function returnsKpis(): Promise<Kpi[]> {
-  const data = await returns();
-  const avg = data.length ? data.reduce((a, b) => a + b.rate, 0) / data.length : 0;
-  const units = data.reduce((a, d) => a + d.units, 0);
-  const reasons = await returnReasons();
+/** Minimum window sales for a SKU to qualify for the "highest rate" headline —
+    1 return on 2 sold is 50% but means nothing. */
+const RATE_MIN_SOLD = 3;
+
+export async function returnsKpis(f: Filter): Promise<Kpi[]> {
+  const { clause, params } = ch(f);
+  const totals = await q1<{ returned: string; sold: string }>(
+    `SELECT
+       (SELECT coalesce(sum(qty),0) FROM returns
+        WHERE return_date >= (now()-make_interval(days => $1::int))::date ${clause}) returned,
+       (SELECT coalesce(sum(oi.qty),0) FROM order_items oi JOIN orders o USING(channel,order_id)
+        WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}) sold`,
+    [f.days, ...params],
+  );
+  const returned = +totals.returned, sold = +totals.sold;
+  const accountRate = sold > 0 ? (returned / sold) * 100 : 0;
+  const data = await returns(f);
+  const topByUnits = [...data].sort((a, b) => b.units - a.units)[0];
+  const worst = data.filter((d) => d.sold >= RATE_MIN_SOLD)[0];
+  const reasons = await returnReasons(f);
   return [
-    { label: "Avg Return Rate", value: data.length ? pct(avg) : "—", sub: "blended" },
-    { label: "Units Returned", value: num(units), sub: "period" },
-    { label: "Worst SKU", value: data.length ? data[0].rate.toFixed(1) + "%" : "—", sub: data[0]?.sku || "" },
-    { label: "Top Reason", value: `<small>${reasons[0]?.reason || "—"}</small>`, sub: reasons[0] ? reasons[0].share + "% of returns" : "" },
+    { label: "Account Return Rate", value: sold ? pct(accountRate) : "—", sub: `${num(returned)} of ${num(sold)} units sold` },
+    { label: "Units Returned", value: num(returned), sub: `last ${f.days} days` },
+    { label: "Top SKU Returns", value: topByUnits ? num(topByUnits.units) : "—", sub: topByUnits ? topByUnits.sku : "no returns in window" },
+    { label: "Highest Return Rate", value: worst ? worst.rate.toFixed(1) + "%" : "—", sub: worst ? `${worst.sku} · ≥${RATE_MIN_SOLD} sold` : `no SKU with ≥${RATE_MIN_SOLD} sold` },
   ];
 }
 
-export async function returnReasons(): Promise<ReturnReason[]> {
+export async function returnReasons(f: Filter): Promise<ReturnReason[]> {
+  const { clause, params } = ch(f);
   const rows = await q<{ reason: string; n: string }>(
-    `SELECT coalesce(reason,'Unspecified') reason, count(*) n FROM returns GROUP BY reason ORDER BY n DESC LIMIT 6`,
+    `SELECT coalesce(reason,'Unspecified') reason, sum(qty) n FROM returns
+     WHERE return_date >= (now()-make_interval(days => $1::int))::date ${clause}
+     GROUP BY coalesce(reason,'Unspecified') ORDER BY n DESC LIMIT 6`,
+    [f.days, ...params],
   );
   const total = rows.reduce((a, r) => a + +r.n, 0) || 1;
   return rows.map((r, i) => ({ reason: r.reason, share: Math.round((+r.n / total) * 100), color: REASON_COLORS[i % REASON_COLORS.length] }));
@@ -369,7 +426,7 @@ export async function decisions(f: Filter): Promise<Decision[]> {
       ask: "List the exact negative keywords to add and the campaigns to add them to, with estimated monthly savings.",
     });
   }
-  const rr = await returns();
+  const rr = await returns(f);
   if (rr.length) {
     list.push({
       icon: "rotate", title: `Return-rate spike · ${rr[0].name}`, severity: "med", severityLabel: "Medium",

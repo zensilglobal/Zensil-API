@@ -48,7 +48,8 @@ export default async function InventoryPage({
                 <tr>
                   <th>Product</th>
                   <th>SKU</th>
-                  <th className="right">On Hand</th>
+                  <th className="right">FBA On Hand</th>
+                  <th className="right">Easy Ship On Hand</th>
                   <th className="right">Velocity</th>
                   <th>Days of Cover</th>
                   <th>Status</th>
@@ -63,7 +64,8 @@ export default async function InventoryPage({
                     <tr key={r.sku}>
                       <td className="strong">{r.name}</td>
                       <td className="num tiny muted">{r.sku}</td>
-                      <td className="right num strong">{num(r.stock)}</td>
+                      <td className="right num strong">{num(r.fba)}</td>
+                      <td className="right num strong">{num(r.easyShip)}</td>
                       <td className="right num">{r.velocity.toFixed(1)}/d</td>
                       <td>
                         <div className="flex" style={{ gap: 10 }}>

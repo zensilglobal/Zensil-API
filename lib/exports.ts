@@ -29,6 +29,8 @@ export function restockCsv(rows: StockRow[]): string {
   const body = rows.map((r) => [
     r.sku,
     r.name,
+    r.fba,
+    r.easyShip,
     r.stock,
     r.velocity.toFixed(1),
     Math.round(r.cover),
@@ -36,7 +38,7 @@ export function restockCsv(rows: StockRow[]): string {
     reorderQty(r.velocity, r.stock),
   ]);
   return toCsv(
-    ["SKU", "Product", "On Hand", "Velocity/Day", "Days Cover", "Status", `Reorder Qty (${TARGET_COVER_DAYS}d cover)`],
+    ["SKU", "Product", "FBA On Hand", "Easy Ship On Hand", "Total On Hand", "Velocity/Day", "Days Cover", "Status", `Reorder Qty (${TARGET_COVER_DAYS}d cover)`],
     body,
   );
 }

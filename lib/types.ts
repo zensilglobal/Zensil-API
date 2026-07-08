@@ -64,7 +64,12 @@ export interface OrderRow {
 export interface StockRow {
   sku: string;
   name: string;
+  /** total sellable units (fba + easyShip) */
   stock: number;
+  /** Amazon FBA (AFN) units on hand */
+  fba: number;
+  /** seller-fulfilled units: Amazon Easy Ship (MFN) + Flipkart + Shopify */
+  easyShip: number;
   velocity: number;
   cover: number;
   status: "critical" | "low" | "healthy";
@@ -89,9 +94,20 @@ export interface WastedRow {
 export interface ReturnRow {
   sku: string;
   name: string;
+  /** returned ÷ sold in the same window; 0 when nothing sold in window */
   rate: number;
   reason: string;
+  /** units returned in window */
   units: number;
+  /** units sold in the same window (rate denominator) */
+  sold: number;
+}
+
+export interface TopProduct {
+  name: string;
+  value: number;
+  units: number;
+  avgPrice: number;
 }
 
 export interface ReturnReason {

@@ -30,9 +30,9 @@ export const getAdvertisingKpis = () => (live ? wh.advertisingKpis() : Promise.r
 export const getCampaigns = () => (live ? wh.campaigns() : Promise.resolve(mock.getCampaigns()));
 export const getWasted = () => (live ? wh.wasted() : Promise.resolve(mock.getWasted()));
 
-export const getReturns = (f: Filter) => (live ? wh.returns() : Promise.resolve(mock.getReturns(f)));
-export const getReturnsKpis = (f: Filter) => (live ? wh.returnsKpis() : Promise.resolve(mock.getReturnsKpis(f)));
-export const getReturnReasons = () => (live ? wh.returnReasons() : Promise.resolve(mock.getReturnReasons()));
+export const getReturns = (f: Filter) => (live ? wh.returns(f) : Promise.resolve(mock.getReturns(f)));
+export const getReturnsKpis = (f: Filter) => (live ? wh.returnsKpis(f) : Promise.resolve(mock.getReturnsKpis(f)));
+export const getReturnReasons = (f: Filter) => (live ? wh.returnReasons(f) : Promise.resolve(mock.getReturnReasons()));
 
 export const getProducts = () => (live ? wh.products() : Promise.resolve(mock.getProducts()));
 export const decisionCount = () => (live ? wh.decisionCount() : Promise.resolve(mock.decisionCount()));

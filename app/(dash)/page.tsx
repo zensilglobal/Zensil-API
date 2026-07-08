@@ -8,7 +8,7 @@ import {
   getTopProducts,
   getDecisions,
 } from "@/lib/queries";
-import { inrK } from "@/lib/format";
+import { inr, inrK, num } from "@/lib/format";
 import { KpiGrid, Card } from "@/components/ui";
 import { RevenueTrend, ChannelDonut } from "@/components/charts";
 import { DecisionCard } from "@/components/DecisionCard";
@@ -74,15 +74,18 @@ export default async function OverviewPage({
             <div className="empty">No decisions pending 🎉</div>
           )}
         </Card>
-        <Card title="Top Products" sub="By revenue, period">
+        <Card title="Top Products" sub="By revenue, period · units & avg price">
           {top.length ? (
             top.map((p) => (
               <div key={p.name} style={{ marginBottom: 14 }}>
-                <div className="flex between" style={{ marginBottom: 6 }}>
+                <div className="flex between" style={{ marginBottom: 3 }}>
                   <span className="tiny strong truncate-cell" style={{ maxWidth: 160 }}>
                     {p.name}
                   </span>
                   <span className="num tiny">{inrK(p.value)}</span>
+                </div>
+                <div className="tiny muted" style={{ marginBottom: 6 }}>
+                  {num(p.units)} units · avg {inr(p.avgPrice)}
                 </div>
                 <div className="bar">
                   <i

@@ -28,12 +28,16 @@ def fetch() -> list[dict]:
         resp = client.get("/listings/v3/inventory", headers=headers)
         resp.raise_for_status()
         for listing in resp.json().get("listings", []):
+            qty = listing.get("availableQuantity", 0)
             rows.append({
                 "channel": "flipkart",
                 "internal_sku": listing.get("sku"),
                 "snapshot_date": today,
-                "available_qty": listing.get("availableQuantity", 0),
+                "available_qty": qty,
                 "inbound_qty": 0,
+                # Flipkart stock is seller-fulfilled — no FBA equivalent.
+                "fba_qty": 0,
+                "easyship_qty": qty,
             })
     return rows
 

@@ -42,12 +42,16 @@ def fetch() -> list[dict]:
             for v in data["nodes"]:
                 if not v.get("sku"):
                     continue
+                qty = v.get("inventoryQuantity") or 0
                 rows.append({
                     "channel": "shopify",
                     "internal_sku": v["sku"],
                     "snapshot_date": today,
-                    "available_qty": v.get("inventoryQuantity") or 0,
+                    "available_qty": qty,
                     "inbound_qty": 0,
+                    # Shopify stock is seller-fulfilled — no FBA equivalent.
+                    "fba_qty": 0,
+                    "easyship_qty": qty,
                 })
             if not data["pageInfo"]["hasNextPage"]:
                 break

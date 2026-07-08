@@ -11,6 +11,7 @@ import {
   WastedRow,
   ReturnRow,
   ReturnReason,
+  TopProduct,
   ProductRow,
   Decision,
   TrendPoint,
@@ -244,12 +245,16 @@ export function getChannelSplit(f: Filter): ChannelSplit {
   return splitOf(windowOrders(f));
 }
 
-export function getTopProducts(f: Filter, limit = 5): { name: string; value: number }[] {
+export function getTopProducts(f: Filter, limit = 5): TopProduct[] {
   const cur = windowOrders(f);
-  const by: Record<string, number> = {};
-  cur.forEach((o) => (by[o.name] = (by[o.name] || 0) + o.value));
+  const by: Record<string, { value: number; units: number }> = {};
+  cur.forEach((o) => {
+    const t = (by[o.name] ||= { value: 0, units: 0 });
+    t.value += o.value;
+    t.units += o.qty;
+  });
   return Object.entries(by)
-    .map(([name, value]) => ({ name, value }))
+    .map(([name, t]) => ({ name, value: t.value, units: t.units, avgPrice: t.units ? t.value / t.units : 0 }))
     .sort((a, b) => b.value - a.value)
     .slice(0, limit);
 }
@@ -263,11 +268,12 @@ export function getSalesKpis(f: Filter): Kpi[] {
   const prevUnits = sum(prev, (o) => o.qty);
   const aov = cur.length ? rev / cur.length : 0;
   const prevAov = prev.length ? prevRev / prev.length : 0;
+  const qs = buildQuery(f);
   return [
-    { label: "Revenue", value: inrK(rev), deltaPct: deltaPct(rev, prevRev), splitHtml: splitHtml(cur) },
-    { label: "Orders", value: num(cur.length), deltaPct: deltaPct(cur.length, prev.length), splitHtml: splitHtml(cur) },
-    { label: "Units Sold", value: num(units), deltaPct: deltaPct(units, prevUnits), sub: "items" },
-    { label: "Avg Order Value", value: inr(aov), deltaPct: deltaPct(aov, prevAov), sub: "per order" },
+    { label: "Revenue", value: inrK(rev), deltaPct: deltaPct(rev, prevRev), splitHtml: splitHtml(cur), href: `/drilldown/revenue${qs}` },
+    { label: "Orders", value: num(cur.length), deltaPct: deltaPct(cur.length, prev.length), splitHtml: splitHtml(cur), href: `/drilldown/orders${qs}` },
+    { label: "Units Sold", value: num(units), deltaPct: deltaPct(units, prevUnits), sub: "items", href: `/drilldown/revenue${qs}` },
+    { label: "Avg Order Value", value: inr(aov), deltaPct: deltaPct(aov, prevAov), sub: "per order", href: `/drilldown/aov${qs}` },
   ];
 }
 
@@ -298,17 +304,20 @@ export function getRecentOrders(f: Filter, limit = 12): { rows: OrderRow[]; tota
 export function getStockHealth(f: Filter): StockRow[] {
   return products
     .map((p) => {
-      let stock: number, velocity: number;
+      // sample mode: Amazon stock is FBA; Flipkart/Shopify stock is seller-fulfilled
+      let stock: number, velocity: number, fba: number;
       if (f.channel === "all") {
         stock = p.azStock + p.fkStock + p.shStock;
         velocity = p.azVel + p.fkVel + p.shVel;
+        fba = p.azStock;
       } else {
         stock = stockFor(p, f.channel);
         velocity = velFor(p, f.channel);
+        fba = f.channel === "amazon" ? p.azStock : 0;
       }
       const cover = velocity ? stock / velocity : 999;
       const status: StockRow["status"] = cover < 7 ? "critical" : cover < 14 ? "low" : "healthy";
-      return { sku: p.sku, name: p.name, stock, velocity, cover, status };
+      return { sku: p.sku, name: p.name, stock, fba, easyShip: stock - fba, velocity, cover, status };
     })
     .sort((a, b) => a.cover - b.cover);
 }
@@ -349,22 +358,27 @@ export function getReturns(f: Filter): ReturnRow[] {
       const heavy = /SILK|VELVET|LEATHER/.test(p.sku) ? 1.6 : 1;
       const rate = (2.5 + rndStable(p.sku) * 9) * heavy;
       const reason = returnReasons[Math.floor(rndStable(p.sku + "r") * returnReasons.length)].reason;
-      const vel = p.azVel + p.fkVel + p.shVel;
-      const units = Math.round((vel * f.days * rate) / 100);
-      return { sku: p.sku, name: p.name, rate, reason, units };
+      const vel = f.channel === "all" ? p.azVel + p.fkVel + p.shVel : velFor(p, f.channel);
+      const sold = Math.round(vel * f.days);
+      const units = Math.round((sold * rate) / 100);
+      return { sku: p.sku, name: p.name, rate, reason, units, sold };
     })
+    .filter((r) => r.units > 0)
     .sort((a, b) => b.rate - a.rate);
 }
 
 export function getReturnsKpis(f: Filter): Kpi[] {
   const data = getReturns(f);
-  const avg = data.reduce((a, b) => a + b.rate, 0) / data.length;
-  const totalUnits = data.reduce((a, d) => a + d.units, 0);
+  const returned = data.reduce((a, d) => a + d.units, 0);
+  const sold = data.reduce((a, d) => a + d.sold, 0);
+  const accountRate = sold ? (returned / sold) * 100 : 0;
+  const topByUnits = [...data].sort((a, b) => b.units - a.units)[0];
+  const worst = data.filter((d) => d.sold >= 3)[0];
   return [
-    { label: "Avg Return Rate", value: pct(avg), deltaPct: -0.8, sub: "blended" },
-    { label: "Units Returned", value: num(totalUnits), deltaPct: 2.1, sub: "period" },
-    { label: "Worst SKU", value: data[0].rate.toFixed(1) + "%", sub: data[0].sku },
-    { label: "Top Reason", value: `<small>${returnReasons[0].reason}</small>`, sub: returnReasons[0].share + "% of returns" },
+    { label: "Account Return Rate", value: sold ? pct(accountRate) : "—", sub: `${num(returned)} of ${num(sold)} units sold` },
+    { label: "Units Returned", value: num(returned), sub: `last ${f.days} days` },
+    { label: "Top SKU Returns", value: topByUnits ? num(topByUnits.units) : "—", sub: topByUnits?.sku || "no returns in window" },
+    { label: "Highest Return Rate", value: worst ? worst.rate.toFixed(1) + "%" : "—", sub: worst ? `${worst.sku} · ≥3 sold` : "no SKU with ≥3 sold" },
   ];
 }
 export const getReturnReasons = (): ReturnReason[] => returnReasons;

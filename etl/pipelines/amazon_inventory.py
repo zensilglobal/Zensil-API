@@ -93,12 +93,18 @@ def fetch() -> tuple[list[dict], list[dict]]:
             + to_int(col(cols, "afn-inbound-shipped-quantity"))
             + to_int(col(cols, "afn-inbound-receiving-quantity"))
         )
+        # The report carries both fulfillment paths: afn-* = FBA stock,
+        # mfn-* = seller-fulfilled (Easy Ship) stock on the same listing.
+        fba = to_int(col(cols, "afn-fulfillable-quantity"))
+        easyship = to_int(col(cols, "mfn-fulfillable-quantity"))
         inv_rows.append({
             "channel": "amazon",
             "internal_sku": sku,
             "snapshot_date": today,
-            "available_qty": to_int(col(cols, "afn-fulfillable-quantity")),
+            "available_qty": fba + easyship,
             "inbound_qty": inbound,
+            "fba_qty": fba,
+            "easyship_qty": easyship,
         })
     return list(sku_rows.values()), inv_rows
 
