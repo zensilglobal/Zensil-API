@@ -4,6 +4,8 @@ import {
   ChannelFilter,
   Filter,
   OrderRow,
+  SkuRevenueRow,
+  OrderLineRow,
   StockRow,
   CampaignRow,
   WastedRow,
@@ -16,6 +18,7 @@ import {
   Kpi,
 } from "./types";
 import { inr, inrK, num, pct, deltaPct, channelName } from "./format";
+import { buildQuery } from "./filter";
 
 /* =====================================================================
    DATA LAYER
@@ -179,12 +182,39 @@ export function getOverviewKpis(f: Filter): Kpi[] {
   const adSpend = campaigns.reduce((a, c) => a + c.spend, 0);
   const adSales = campaigns.reduce((a, c) => a + c.sales, 0);
   const acos = adSales ? (adSpend / adSales) * 100 : 0;
+  const qs = buildQuery(f);
   return [
-    { label: "Net Revenue", value: inrK(rev), deltaPct: deltaPct(rev, prevRev), splitHtml: splitHtml(cur) },
-    { label: "Orders", value: num(cur.length), deltaPct: deltaPct(cur.length, prev.length), splitHtml: splitHtml(cur) },
-    { label: "Avg Order Value", value: inr(aov), deltaPct: deltaPct(aov, prevAov), sub: "per order" },
-    { label: "Blended ACOS", value: pct(acos), deltaPct: -3.2, sub: "Amazon ads" },
+    { label: "Net Revenue", value: inrK(rev), deltaPct: deltaPct(rev, prevRev), splitHtml: splitHtml(cur), href: `/drilldown/revenue${qs}` },
+    { label: "Orders", value: num(cur.length), deltaPct: deltaPct(cur.length, prev.length), splitHtml: splitHtml(cur), href: `/drilldown/orders${qs}` },
+    { label: "Avg Order Value", value: inr(aov), deltaPct: deltaPct(aov, prevAov), sub: "per order", href: `/drilldown/aov${qs}` },
+    { label: "Blended ACOS", value: pct(acos), deltaPct: -3.2, sub: "Amazon ads", href: `/drilldown/acos${qs}` },
   ];
+}
+
+export function getRevenueBySku(f: Filter): SkuRevenueRow[] {
+  const cur = windowOrders(f);
+  const by = new Map<string, SkuRevenueRow>();
+  cur.forEach((o) => {
+    const key = o.sku + "|" + o.channel;
+    const row = by.get(key) || { sku: o.sku, name: o.name, channel: o.channel, units: 0, orders: 0, avgPrice: 0, revenue: 0 };
+    row.units += o.qty;
+    row.orders += 1;
+    row.revenue += o.value;
+    by.set(key, row);
+  });
+  return [...by.values()]
+    .map((r) => ({ ...r, avgPrice: r.units ? r.revenue / r.units : 0 }))
+    .sort((a, b) => b.revenue - a.revenue);
+}
+
+export function getOrderLines(f: Filter): OrderLineRow[] {
+  // sample orders carry one SKU each, so one line per order.
+  return windowOrders(f)
+    .map((o) => ({
+      id: o.id, channel: o.channel, date: o.date, sku: o.sku, name: o.name,
+      qty: o.qty, price: o.qty ? o.value / o.qty : 0, value: o.value, region: o.region, status: o.status,
+    }))
+    .sort((a, b) => +new Date(b.date) - +new Date(a.date));
 }
 
 export function getTrend(f: Filter): TrendPoint[] {

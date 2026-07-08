@@ -13,6 +13,33 @@ export interface Kpi {
   deltaPct?: number | null;
   sub?: string;
   splitHtml?: string;
+  /** When set, the KPI card becomes a link to this drill-down page. */
+  href?: string;
+}
+
+/** Revenue drill-down: one row per SKU × channel in the window. */
+export interface SkuRevenueRow {
+  sku: string;
+  name: string;
+  channel: Channel;
+  units: number;
+  orders: number;
+  avgPrice: number;
+  revenue: number;
+}
+
+/** Order drill-down: one row per order line in the window. */
+export interface OrderLineRow {
+  id: string;
+  channel: Channel;
+  date: string; // ISO
+  sku: string;
+  name: string;
+  qty: number;
+  price: number;
+  value: number;
+  region: string;
+  status: "delivered" | "transit" | "pending" | "returned";
 }
 
 export interface TrendPoint {

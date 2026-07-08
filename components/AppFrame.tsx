@@ -32,6 +32,10 @@ const TITLES: Record<string, { t: string; s: string }> = {
   "/returns": { t: "Returns", s: "Return-rate outliers & reasons" },
   "/products": { t: "Products", s: "Cross-channel SKU master" },
   "/insights": { t: "Claude Insights", s: "Ask plain-English questions over live data" },
+  "/drilldown/revenue": { t: "Net Revenue — Detail", s: "Every rupee by product, channel, price & units" },
+  "/drilldown/orders": { t: "Orders — Detail", s: "Every order line in the window, SKU-wise" },
+  "/drilldown/aov": { t: "Avg Order Value — Detail", s: "The per-order values behind the average" },
+  "/drilldown/acos": { t: "Blended ACOS — Detail", s: "Campaign spend, attributed sales & wasted terms" },
 };
 
 const CHANNELS: { id: ChannelFilter; label: string; color?: string }[] = [

@@ -6,6 +6,8 @@ import {
   TrendPoint,
   ChannelSplit,
   OrderRow,
+  SkuRevenueRow,
+  OrderLineRow,
   StockRow,
   CampaignRow,
   WastedRow,
@@ -17,6 +19,7 @@ import {
   SyncStatus,
 } from "./types";
 import { inr, inrK, num, pct, deltaPct } from "./format";
+import { buildQuery } from "./filter";
 
 /* channel filter helper: days is always $1; channel (if any) is $2 */
 function ch(f: Filter): { clause: string; params: unknown[] } {
@@ -59,12 +62,57 @@ export async function overviewKpis(f: Filter): Promise<Kpi[]> {
     [f.days],
   );
   const acos = +ad.sales ? (+ad.spend / +ad.sales) * 100 : 0;
+  const qs = buildQuery(f);
   return [
-    { label: "Net Revenue", value: inrK(rev), deltaPct: deltaPct(rev, prevRev), splitHtml: splitHtml(split) },
-    { label: "Orders", value: num(ord), deltaPct: deltaPct(ord, prevOrd), splitHtml: splitHtml(split) },
-    { label: "Avg Order Value", value: inr(aov), deltaPct: deltaPct(aov, prevAov), sub: "per order" },
-    { label: "Blended ACOS", value: acos ? pct(acos) : "—", deltaPct: null, sub: "Amazon ads" },
+    { label: "Net Revenue", value: inrK(rev), deltaPct: deltaPct(rev, prevRev), splitHtml: splitHtml(split), href: `/drilldown/revenue${qs}` },
+    { label: "Orders", value: num(ord), deltaPct: deltaPct(ord, prevOrd), splitHtml: splitHtml(split), href: `/drilldown/orders${qs}` },
+    { label: "Avg Order Value", value: inr(aov), deltaPct: deltaPct(aov, prevAov), sub: "per order", href: `/drilldown/aov${qs}` },
+    { label: "Blended ACOS", value: acos ? pct(acos) : "—", deltaPct: null, sub: "Amazon ads", href: `/drilldown/acos${qs}` },
   ];
+}
+
+/** Revenue drill-down: where every rupee came from, per SKU × channel. */
+export async function revenueBySku(f: Filter): Promise<SkuRevenueRow[]> {
+  const { clause, params } = ch(f);
+  const rows = await q<{ sku: string; name: string; channel: Channel; units: string; orders: string; avg_price: string; revenue: string }>(
+    `SELECT oi.internal_sku sku, sm.product_name name, o.channel,
+       coalesce(sum(oi.qty),0) units, count(distinct o.order_id) orders,
+       coalesce(avg(oi.unit_price),0) avg_price, coalesce(sum(oi.qty*oi.unit_price),0) revenue
+     FROM order_items oi JOIN orders o USING(channel,order_id) JOIN sku_master sm ON sm.internal_sku=oi.internal_sku
+     WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}
+     GROUP BY oi.internal_sku, sm.product_name, o.channel
+     ORDER BY revenue DESC`,
+    [f.days, ...params],
+  );
+  return rows.map((r) => ({
+    sku: r.sku, name: r.name, channel: r.channel,
+    units: +r.units, orders: +r.orders, avgPrice: +r.avg_price, revenue: +r.revenue,
+  }));
+}
+
+/** Orders drill-down: every order line in the window (capped for sanity). */
+export async function orderLines(f: Filter, limit = 2000): Promise<OrderLineRow[]> {
+  const { clause, params } = ch(f);
+  const rows = await q<{ id: string; channel: Channel; date: string; sku: string; name: string; qty: string; price: string; region: string; status: string }>(
+    `SELECT o.order_id id, o.channel, o.order_date date, oi.internal_sku sku, sm.product_name name,
+       oi.qty, oi.unit_price price, o.buyer_region region, o.status
+     FROM order_items oi JOIN orders o USING(channel,order_id) JOIN sku_master sm ON sm.internal_sku=oi.internal_sku
+     WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}
+     ORDER BY o.order_date DESC LIMIT ${Number(limit)}`,
+    [f.days, ...params],
+  );
+  return rows.map((r) => ({
+    id: r.id.startsWith("#") ? r.id : "#" + r.id,
+    channel: r.channel,
+    date: new Date(r.date).toISOString(),
+    sku: r.sku,
+    name: r.name,
+    qty: +r.qty,
+    price: +r.price,
+    value: +r.qty * +r.price,
+    region: r.region || "—",
+    status: mapStatus(r.status),
+  }));
 }
 
 export async function channelSplit(f: Filter): Promise<ChannelSplit> {

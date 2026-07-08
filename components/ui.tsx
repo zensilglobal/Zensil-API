@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { Kpi, Channel } from "@/lib/types";
 import { channelName } from "@/lib/format";
 
@@ -13,8 +15,13 @@ export function KpiGrid({ kpis }: { kpis: Kpi[] }) {
 
 export function KpiCard({ kpi }: { kpi: Kpi }) {
   const d = kpi.deltaPct;
-  return (
-    <div className="kpi">
+  const inner = (
+    <>
+      {kpi.href && (
+        <span className="kpi-go">
+          <ArrowUpRight size={14} />
+        </span>
+      )}
       <div className="lab">{kpi.label}</div>
       <div className="val" dangerouslySetInnerHTML={{ __html: kpi.value }} />
       <div className="meta">
@@ -29,7 +36,14 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
           <span className="split-mini">{kpi.sub}</span>
         )}
       </div>
-    </div>
+    </>
+  );
+  return kpi.href ? (
+    <Link href={kpi.href} className="kpi kpi-link" aria-label={`${kpi.label} — view detail`}>
+      {inner}
+    </Link>
+  ) : (
+    <div className="kpi">{inner}</div>
   );
 }
 

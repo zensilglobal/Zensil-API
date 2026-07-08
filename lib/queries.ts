@@ -15,6 +15,9 @@ export const getTopProducts = (f: Filter, limit?: number) =>
   live ? wh.topProducts(f, limit) : Promise.resolve(mock.getTopProducts(f, limit));
 export const getDecisions = (f: Filter) => (live ? wh.decisions(f) : Promise.resolve(mock.getDecisions(f)));
 
+export const getRevenueBySku = (f: Filter) => (live ? wh.revenueBySku(f) : Promise.resolve(mock.getRevenueBySku(f)));
+export const getOrderLines = (f: Filter) => (live ? wh.orderLines(f) : Promise.resolve(mock.getOrderLines(f)));
+
 export const getSalesKpis = (f: Filter) => (live ? wh.salesKpis(f) : Promise.resolve(mock.getSalesKpis(f)));
 export const getOrdersPerDay = (f: Filter) => (live ? wh.ordersPerDay(f) : Promise.resolve(mock.getOrdersPerDay(f)));
 export const getRecentOrders = (f: Filter, limit?: number) =>
