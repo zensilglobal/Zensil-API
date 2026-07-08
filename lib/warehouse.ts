@@ -130,8 +130,8 @@ export async function channelSplit(f: Filter): Promise<ChannelSplit> {
 }
 
 export async function trend(f: Filter): Promise<TrendPoint[]> {
-  const rows = await q<{ label: string; amazon: string; flipkart: string; shopify: string }>(
-    `SELECT to_char(d.day,'DD Mon') label,
+  const rows = await q<{ label: string; date: string; amazon: string; flipkart: string; shopify: string }>(
+    `SELECT to_char(d.day,'DD Mon') label, to_char(d.day,'YYYY-MM-DD') date,
        coalesce(sum(o.total_value) filter (where o.channel='amazon'),0) amazon,
        coalesce(sum(o.total_value) filter (where o.channel='flipkart'),0) flipkart,
        coalesce(sum(o.total_value) filter (where o.channel='shopify'),0) shopify
@@ -140,13 +140,13 @@ export async function trend(f: Filter): Promise<TrendPoint[]> {
      GROUP BY d.day ORDER BY d.day`,
     [f.days],
   );
-  return rows.map((r) => ({ label: r.label, amazon: +r.amazon, flipkart: +r.flipkart, shopify: +r.shopify }));
+  return rows.map((r) => ({ label: r.label, date: r.date, amazon: +r.amazon, flipkart: +r.flipkart, shopify: +r.shopify }));
 }
 
 export async function ordersPerDay(f: Filter): Promise<TrendPoint[]> {
   const days = Math.min(f.days, 30);
-  const rows = await q<{ label: string; amazon: string; flipkart: string; shopify: string }>(
-    `SELECT to_char(d.day,'DD Mon') label,
+  const rows = await q<{ label: string; date: string; amazon: string; flipkart: string; shopify: string }>(
+    `SELECT to_char(d.day,'DD Mon') label, to_char(d.day,'YYYY-MM-DD') date,
        count(o.*) filter (where o.channel='amazon') amazon,
        count(o.*) filter (where o.channel='flipkart') flipkart,
        count(o.*) filter (where o.channel='shopify') shopify
@@ -155,7 +155,7 @@ export async function ordersPerDay(f: Filter): Promise<TrendPoint[]> {
      GROUP BY d.day ORDER BY d.day`,
     [days],
   );
-  return rows.map((r) => ({ label: r.label, amazon: +r.amazon, flipkart: +r.flipkart, shopify: +r.shopify }));
+  return rows.map((r) => ({ label: r.label, date: r.date, amazon: +r.amazon, flipkart: +r.flipkart, shopify: +r.shopify }));
 }
 
 export async function salesKpis(f: Filter): Promise<Kpi[]> {

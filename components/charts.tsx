@@ -1,4 +1,5 @@
 "use client";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -12,9 +13,28 @@ import {
   PieChart,
   Pie,
   Cell,
+  type MouseHandlerDataParam,
 } from "recharts";
 import { TrendPoint, ChannelFilter, ChannelSplit } from "@/lib/types";
 import { inrK, inr } from "@/lib/format";
+
+/**
+ * Chart-level click → that day's order lines in the drill-down, keeping the
+ * current channel/period query string. Recharts v3 hands back the active
+ * point's index, which we resolve against the chart's own data.
+ */
+function useDayDrill(data: TrendPoint[]) {
+  const router = useRouter();
+  const sp = useSearchParams();
+  return (st: MouseHandlerDataParam) => {
+    const i = Number(st?.activeIndex);
+    const date = Number.isInteger(i) ? data[i]?.date : undefined;
+    if (!date) return;
+    const p = new URLSearchParams(sp.toString());
+    p.set("date", date);
+    router.push(`/drilldown/orders?${p.toString()}`);
+  };
+}
 
 const COLORS = { amazon: "#d4af37", flipkart: "#3f8fe0", shopify: "#5fb87a" };
 const GRID = "rgba(255,255,255,.05)";
@@ -35,10 +55,11 @@ function activeChannels(channel: ChannelFilter): (keyof typeof COLORS)[] {
 
 export function RevenueTrend({ data, channel }: { data: TrendPoint[]; channel: ChannelFilter }) {
   const chans = activeChannels(channel);
+  const dayDrill = useDayDrill(data);
   return (
-    <div style={{ height: 260 }}>
+    <div style={{ height: 260, cursor: "pointer" }} title="Click a day to see its orders">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} onClick={dayDrill}>
           <defs>
             {chans.map((c) => (
               <linearGradient key={c} id={`g-${c}`} x1="0" y1="0" x2="0" y2="1">
@@ -62,10 +83,11 @@ export function RevenueTrend({ data, channel }: { data: TrendPoint[]; channel: C
 
 export function OrdersBar({ data, channel }: { data: TrendPoint[]; channel: ChannelFilter }) {
   const chans = activeChannels(channel);
+  const dayDrill = useDayDrill(data);
   return (
-    <div style={{ height: 260 }}>
+    <div style={{ height: 260, cursor: "pointer" }} title="Click a day to see its orders">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} onClick={dayDrill}>
           <CartesianGrid stroke={GRID} vertical={false} />
           <XAxis dataKey="label" stroke={TICK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={20} />
           <YAxis stroke={TICK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={36} allowDecimals={false} />

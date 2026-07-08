@@ -44,6 +44,8 @@ export interface OrderLineRow {
 
 export interface TrendPoint {
   label: string;
+  /** ISO yyyy-mm-dd of the point — used for click-through to that day's orders */
+  date?: string;
   amazon: number;
   flipkart: number;
   shopify: number;

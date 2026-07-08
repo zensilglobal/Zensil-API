@@ -234,6 +234,7 @@ export function getTrend(f: Filter): TrendPoint[] {
     });
     points.push({
       label: dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" }),
+      date: dt.toISOString().slice(0, 10),
       amazon: sum(slice.filter((o) => o.channel === "amazon"), (o) => o.value),
       flipkart: sum(slice.filter((o) => o.channel === "flipkart"), (o) => o.value),
       shopify: sum(slice.filter((o) => o.channel === "shopify"), (o) => o.value),
@@ -288,6 +289,7 @@ export function getOrdersPerDay(f: Filter): TrendPoint[] {
     const slice = ALL_ORDERS.filter((o) => new Date(o.date).toDateString() === dayKey);
     points.push({
       label: dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" }),
+      date: dt.toISOString().slice(0, 10),
       amazon: slice.filter((o) => o.channel === "amazon").length,
       flipkart: slice.filter((o) => o.channel === "flipkart").length,
       shopify: slice.filter((o) => o.channel === "shopify").length,

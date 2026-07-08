@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Info } from "lucide-react";
+import { ArrowLeft, Info, X } from "lucide-react";
 import { parseFilter, buildQuery } from "@/lib/filter";
 import {
   getRevenueBySku,
@@ -15,7 +15,7 @@ import {
   getReturns,
   getReturnLines,
 } from "@/lib/queries";
-import { inr, inrK, num } from "@/lib/format";
+import { inr, inrK, num, dayLabel } from "@/lib/format";
 import { Filter, OrderLineRow } from "@/lib/types";
 import { KpiGrid, Card } from "@/components/ui";
 import DrilldownTable, { DrillCol } from "@/components/DrilldownTable";
@@ -97,13 +97,16 @@ async function RevenueDrill({ f }: { f: Filter }) {
   );
 }
 
-async function OrdersDrill({ f }: { f: Filter }) {
-  const rows = await getOrderLines(f);
+async function OrdersDrill({ f, date }: { f: Filter; date?: string }) {
+  const all = await getOrderLines(f);
+  const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined;
+  const rows = day ? all.filter((r) => String(r.date).slice(0, 10) === day) : all;
   const orders = new Set(rows.map((r) => r.id)).size;
   const units = rows.reduce((a, r) => a + r.qty, 0);
   const revenue = rows.reduce((a, r) => a + r.value, 0);
+  const windowLabel = day ? dayLabel(day + "T00:00:00Z") : `last ${f.days} days`;
   const kpis = [
-    { label: "Orders", value: num(orders), sub: `last ${f.days} days` },
+    { label: "Orders", value: num(orders), sub: windowLabel },
     { label: "Units Sold", value: num(units), sub: "items" },
     { label: "Revenue", value: inrK(revenue), sub: "order lines" },
     { label: "Avg Order Value", value: inr(orders ? revenue / orders : 0), sub: "per order" },
@@ -112,11 +115,21 @@ async function OrdersDrill({ f }: { f: Filter }) {
     <>
       <KpiGrid kpis={kpis} />
       <div className="mt">
-        <Card title="All Order Lines" sub="Every order in the window, SKU-wise — product, units, price & status">
+        <Card
+          title={day ? `Order Lines — ${windowLabel}` : "All Order Lines"}
+          sub="Every order, SKU-wise — product, units, price & status"
+          action={
+            day ? (
+              <Link className="btn ghost" href={`/drilldown/orders${buildQuery(f)}`}>
+                <X size={15} /> {windowLabel} only — show all days
+              </Link>
+            ) : undefined
+          }
+        >
           <DrilldownTable
             rows={rows as unknown as Record<string, string | number>[]}
             cols={ORDER_LINE_COLS}
-            filename={`zensil-orders-${f.channel}-${f.days}d`}
+            filename={`zensil-orders-${f.channel}-${day || `${f.days}d`}`}
             initialSort={{ key: "date", dir: "desc" }}
           />
         </Card>
@@ -328,7 +341,7 @@ export default async function DrilldownPage({
     <>
       <BackLink f={f} metric={metric as Metric} />
       {metric === "revenue" && <RevenueDrill f={f} />}
-      {metric === "orders" && <OrdersDrill f={f} />}
+      {metric === "orders" && <OrdersDrill f={f} date={one(sp.date)} />}
       {metric === "aov" && <AovDrill f={f} />}
       {metric === "acos" && <AcosDrill f={f} />}
       {metric === "stock" && <StockDrill f={f} status={one(sp.status)} />}
