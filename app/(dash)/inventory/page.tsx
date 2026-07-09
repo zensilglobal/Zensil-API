@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { parseFilter } from "@/lib/filter";
+import { parseFilter, buildQuery } from "@/lib/filter";
 import { getInventoryKpis, getStockHealth } from "@/lib/queries";
 import { num } from "@/lib/format";
 import { restockCsv, todayStamp } from "@/lib/exports";
@@ -62,7 +62,11 @@ export default async function InventoryPage({
                     r.status === "critical" ? "var(--color-crimson)" : r.status === "low" ? "var(--color-gold)" : "var(--color-green)";
                   return (
                     <tr key={r.sku}>
-                      <td className="strong">{r.name}</td>
+                      <td className="strong">
+                        <Link className="plink" href={`/products/${encodeURIComponent(r.sku)}${buildQuery(f)}`}>
+                          {r.name}
+                        </Link>
+                      </td>
                       <td className="num tiny muted">{r.sku}</td>
                       <td className="right num strong">{num(r.fba)}</td>
                       <td className="right num strong">{num(r.easyShip)}</td>

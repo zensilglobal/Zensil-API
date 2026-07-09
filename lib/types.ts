@@ -1,10 +1,15 @@
 export type Channel = "amazon" | "flipkart" | "shopify";
 export type ChannelFilter = "all" | Channel;
-export type RangeDays = 7 | 30 | 90;
+export type RangeDays = 7 | 15 | 30 | 90;
 
 export interface Filter {
   channel: ChannelFilter;
-  days: RangeDays;
+  /** window length in days; for a custom window this is the span of from→to */
+  days: number;
+  /** custom window start, ISO yyyy-mm-dd (inclusive). Set together with `to`. */
+  from?: string;
+  /** custom window end, ISO yyyy-mm-dd (inclusive). Set together with `from`. */
+  to?: string;
 }
 
 export interface Kpi {
@@ -117,6 +122,7 @@ export interface ReturnLineRow {
 }
 
 export interface TopProduct {
+  sku: string;
   name: string;
   value: number;
   units: number;

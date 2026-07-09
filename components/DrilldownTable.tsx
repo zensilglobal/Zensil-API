@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { toCsv, todayStamp } from "@/lib/exports";
 import { inr, num, dayLabel, channelName } from "@/lib/format";
@@ -62,6 +63,7 @@ export default function DrilldownTable({
   initialSort,
   initialSearch = "",
   initialPicks,
+  linkTo,
 }: {
   rows: Row[];
   cols: DrillCol[];
@@ -71,7 +73,11 @@ export default function DrilldownTable({
   initialSearch?: string;
   /** pre-select column filters (e.g. { status: "critical" }) */
   initialPicks?: Record<string, string>;
+  /** make each row navigate to `${base}/${row[key]}` keeping the global filters */
+  linkTo?: { base: string; key: string };
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [qText, setQText] = useState(initialSearch);
   const [picks, setPicks] = useState<Record<string, string>>(initialPicks ?? {});
   const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(initialSort ?? null);
@@ -130,6 +136,20 @@ export default function DrilldownTable({
   }
 
   const align = (c: DrillCol) => (NUMERIC.includes(c.kind || "text") ? "right" : undefined);
+
+  function rowHref(r: Row): string | undefined {
+    if (!linkTo) return undefined;
+    const id = String(r[linkTo.key] ?? "");
+    if (!id) return undefined;
+    // keep only the global filters when jumping to a detail page
+    const p = new URLSearchParams();
+    for (const k of ["channel", "days", "from", "to"] as const) {
+      const v = searchParams.get(k);
+      if (v) p.set(k, v);
+    }
+    const qs = p.toString();
+    return `${linkTo.base}/${encodeURIComponent(id)}${qs ? `?${qs}` : ""}`;
+  }
 
   return (
     <div>
@@ -190,8 +210,15 @@ export default function DrilldownTable({
             </tr>
           </thead>
           <tbody>
-            {visible.map((r, i) => (
-              <tr key={i}>
+            {visible.map((r, i) => {
+              const href = rowHref(r);
+              return (
+              <tr
+                key={i}
+                className={href ? "rowlink" : undefined}
+                title={href ? "Open product detail" : undefined}
+                onClick={href ? () => router.push(href) : undefined}
+              >
                 {cols.map((c) => {
                   const kind = c.kind || "text";
                   if (kind === "channel")
@@ -217,7 +244,8 @@ export default function DrilldownTable({
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
             {!visible.length && (
               <tr>
                 <td colSpan={cols.length}>

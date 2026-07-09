@@ -1,8 +1,19 @@
 import { getProducts } from "@/lib/queries";
-import { num } from "@/lib/format";
-import { Card, ChannelChip } from "@/components/ui";
+import { Card } from "@/components/ui";
+import DrilldownTable, { DrillCol } from "@/components/DrilldownTable";
 
 export const dynamic = "force-dynamic";
+
+const COLS: DrillCol[] = [
+  { key: "name", label: "Product", strong: true },
+  { key: "sku", label: "SKU" },
+  { key: "amazonVel", label: "Amazon /d", kind: "float" },
+  { key: "flipkartVel", label: "Flipkart /d", kind: "float" },
+  { key: "shopifyVel", label: "Shopify /d", kind: "float" },
+  { key: "marginPct", label: "Margin", kind: "pct" },
+  { key: "totalStock", label: "Total Stock", kind: "int", total: true },
+  { key: "bestChannel", label: "Best Channel", kind: "channel", filter: true },
+];
 
 export default async function ProductsPage() {
   const products = await getProducts();
@@ -11,48 +22,20 @@ export default async function ProductsPage() {
       <div className="section-head">
         <div>
           <h2>Cross-Channel SKU Master</h2>
-          <p>Amazon vs Flipkart vs Shopify velocity, contribution margin &amp; stock — one row per product</p>
+          <p>
+            Amazon vs Flipkart vs Shopify velocity, contribution margin &amp; stock — click any product for its full
+            detail page
+          </p>
         </div>
       </div>
       <Card>
-        <div style={{ overflowX: "auto" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>SKU</th>
-                <th className="right">Amazon</th>
-                <th className="right">Flipkart</th>
-                <th className="right">Shopify</th>
-                <th className="right">Margin</th>
-                <th className="right">Total Stock</th>
-                <th className="right">Best Channel</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => (
-                <tr key={p.sku}>
-                  <td className="strong">{p.name}</td>
-                  <td className="num tiny muted">{p.sku}</td>
-                  <td className="right num" style={{ color: "var(--color-amazon)" }}>
-                    {p.amazonVel.toFixed(1)}/d
-                  </td>
-                  <td className="right num" style={{ color: "var(--color-flipkart)" }}>
-                    {p.flipkartVel.toFixed(1)}/d
-                  </td>
-                  <td className="right num" style={{ color: "var(--color-shopify)" }}>
-                    {p.shopifyVel.toFixed(1)}/d
-                  </td>
-                  <td className="right num">{p.marginPct.toFixed(0)}%</td>
-                  <td className="right num">{num(p.totalStock)}</td>
-                  <td className="right">
-                    <ChannelChip channel={p.bestChannel} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DrilldownTable
+          rows={products as unknown as Record<string, string | number>[]}
+          cols={COLS}
+          filename="zensil-products"
+          initialSort={{ key: "totalStock", dir: "desc" }}
+          linkTo={{ base: "/products", key: "sku" }}
+        />
       </Card>
     </>
   );

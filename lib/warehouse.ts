@@ -21,15 +21,22 @@ import {
   SyncStatus,
 } from "./types";
 import { inr, inrK, num, pct, deltaPct } from "./format";
-import { buildQuery } from "./filter";
+import { buildQuery, windowOf, windowLabel } from "./filter";
 
-/* channel filter helper: days is always $1; channel (if any) is $2 */
-function ch(f: Filter): { clause: string; params: unknown[] } {
+/*
+  Every windowed query works on a half-open [start, endEx) date window
+  resolved by windowOf(), so the 7/15/30/90-day presets and the custom
+  from→to picker all run through the same SQL.
+*/
+
+/** channel filter helper: emits " AND channel = $idx" when a channel is selected */
+function ch(f: Filter, idx: number): { clause: string; params: unknown[] } {
   if (f.channel === "all") return { clause: "", params: [] };
-  return { clause: " AND channel = $2", params: [f.channel] };
+  return { clause: ` AND channel = $${idx}`, params: [f.channel] };
 }
 
-const REASON_COLORS = ["#c22222", "#d4af37", "#1f7a4d", "#3f8fe0", "#5fb87a", "#7a7a82"];
+// theme-aware categorical palette (defined per theme in globals.css)
+const REASON_COLORS = ["var(--cat-1)", "var(--cat-2)", "var(--cat-3)", "var(--cat-4)", "var(--cat-5)", "var(--cat-6)"];
 
 function splitHtml(s: ChannelSplit): string {
   const t = s.amazon + s.flipkart + s.shopify || 1;
@@ -45,23 +52,24 @@ function mapStatus(raw: string | null): OrderRow["status"] {
 }
 
 export async function overviewKpis(f: Filter): Promise<Kpi[]> {
-  const { clause, params } = ch(f);
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 4);
   const row = await q1<{ rev: string; prev_rev: string; ord: string; prev_ord: string }>(
     `SELECT
-       coalesce(sum(total_value) filter (where order_date >= now()-make_interval(days => $1::int)),0) rev,
-       coalesce(sum(total_value) filter (where order_date <  now()-make_interval(days => $1::int)),0) prev_rev,
-       count(*) filter (where order_date >= now()-make_interval(days => $1::int)) ord,
-       count(*) filter (where order_date <  now()-make_interval(days => $1::int)) prev_ord
-     FROM orders WHERE order_date >= now()-make_interval(days => 2 * $1::int) ${clause}`,
-    [f.days, ...params],
+       coalesce(sum(total_value) filter (where order_date >= $2::timestamptz),0) rev,
+       coalesce(sum(total_value) filter (where order_date <  $2::timestamptz),0) prev_rev,
+       count(*) filter (where order_date >= $2::timestamptz) ord,
+       count(*) filter (where order_date <  $2::timestamptz) prev_ord
+     FROM orders WHERE order_date >= $1::timestamptz AND order_date < $3::timestamptz ${clause}`,
+    [w.prevStart, w.start, w.endEx, ...params],
   );
   const rev = +row.rev, prevRev = +row.prev_rev, ord = +row.ord, prevOrd = +row.prev_ord;
   const aov = ord ? rev / ord : 0, prevAov = prevOrd ? prevRev / prevOrd : 0;
   const split = await channelSplit(f);
   const ad = await q1<{ spend: string; sales: string }>(
     `SELECT coalesce(sum(spend),0) spend, coalesce(sum(attributed_sales),0) sales
-     FROM ad_spend WHERE report_date >= now()::date - $1::int`,
-    [f.days],
+     FROM ad_spend WHERE report_date >= $1::date AND report_date < $2::date`,
+    [w.start, w.endEx],
   );
   const acos = +ad.sales ? (+ad.spend / +ad.sales) * 100 : 0;
   const qs = buildQuery(f);
@@ -75,16 +83,17 @@ export async function overviewKpis(f: Filter): Promise<Kpi[]> {
 
 /** Revenue drill-down: where every rupee came from, per SKU × channel. */
 export async function revenueBySku(f: Filter): Promise<SkuRevenueRow[]> {
-  const { clause, params } = ch(f);
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
   const rows = await q<{ sku: string; name: string; channel: Channel; units: string; orders: string; avg_price: string; revenue: string }>(
     `SELECT oi.internal_sku sku, sm.product_name name, o.channel,
        coalesce(sum(oi.qty),0) units, count(distinct o.order_id) orders,
        coalesce(avg(oi.unit_price),0) avg_price, coalesce(sum(oi.qty*oi.unit_price),0) revenue
      FROM order_items oi JOIN orders o USING(channel,order_id) JOIN sku_master sm ON sm.internal_sku=oi.internal_sku
-     WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}
+     WHERE o.order_date >= $1::timestamptz AND o.order_date < $2::timestamptz ${clause.replace("channel", "o.channel")}
      GROUP BY oi.internal_sku, sm.product_name, o.channel
      ORDER BY revenue DESC`,
-    [f.days, ...params],
+    [w.start, w.endEx, ...params],
   );
   return rows.map((r) => ({
     sku: r.sku, name: r.name, channel: r.channel,
@@ -94,14 +103,15 @@ export async function revenueBySku(f: Filter): Promise<SkuRevenueRow[]> {
 
 /** Orders drill-down: every order line in the window (capped for sanity). */
 export async function orderLines(f: Filter, limit = 2000): Promise<OrderLineRow[]> {
-  const { clause, params } = ch(f);
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
   const rows = await q<{ id: string; channel: Channel; date: string; sku: string; name: string; qty: string; price: string; region: string; status: string }>(
     `SELECT o.order_id id, o.channel, o.order_date date, oi.internal_sku sku, sm.product_name name,
        oi.qty, oi.unit_price price, o.buyer_region region, o.status
      FROM order_items oi JOIN orders o USING(channel,order_id) JOIN sku_master sm ON sm.internal_sku=oi.internal_sku
-     WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}
+     WHERE o.order_date >= $1::timestamptz AND o.order_date < $2::timestamptz ${clause.replace("channel", "o.channel")}
      ORDER BY o.order_date DESC LIMIT ${Number(limit)}`,
-    [f.days, ...params],
+    [w.start, w.endEx, ...params],
   );
   return rows.map((r) => ({
     id: r.id.startsWith("#") ? r.id : "#" + r.id,
@@ -118,11 +128,12 @@ export async function orderLines(f: Filter, limit = 2000): Promise<OrderLineRow[
 }
 
 export async function channelSplit(f: Filter): Promise<ChannelSplit> {
-  const { clause, params } = ch(f);
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
   const rows = await q<{ channel: Channel; v: string }>(
     `SELECT channel, coalesce(sum(total_value),0) v FROM orders
-     WHERE order_date >= now()-make_interval(days => $1::int) ${clause} GROUP BY channel`,
-    [f.days, ...params],
+     WHERE order_date >= $1::timestamptz AND order_date < $2::timestamptz ${clause} GROUP BY channel`,
+    [w.start, w.endEx, ...params],
   );
   const s: ChannelSplit = { amazon: 0, flipkart: 0, shopify: 0 };
   rows.forEach((r) => (s[r.channel] = +r.v));
@@ -130,48 +141,70 @@ export async function channelSplit(f: Filter): Promise<ChannelSplit> {
 }
 
 export async function trend(f: Filter): Promise<TrendPoint[]> {
+  const w = windowOf(f);
   const rows = await q<{ label: string; date: string; amazon: string; flipkart: string; shopify: string }>(
     `SELECT to_char(d.day,'DD Mon') label, to_char(d.day,'YYYY-MM-DD') date,
        coalesce(sum(o.total_value) filter (where o.channel='amazon'),0) amazon,
        coalesce(sum(o.total_value) filter (where o.channel='flipkart'),0) flipkart,
        coalesce(sum(o.total_value) filter (where o.channel='shopify'),0) shopify
-     FROM generate_series((now()-make_interval(days => $1::int))::date, now()::date, '1 day') d(day)
+     FROM generate_series($1::date, $2::date - 1, '1 day') d(day)
      LEFT JOIN orders o ON o.order_date::date = d.day
      GROUP BY d.day ORDER BY d.day`,
-    [f.days],
+    [w.start, w.endEx],
+  );
+  return rows.map((r) => ({ label: r.label, date: r.date, amazon: +r.amazon, flipkart: +r.flipkart, shopify: +r.shopify }));
+}
+
+/** Revenue trend for one SKU, by channel — powers the product-detail page. */
+export async function skuTrend(f: Filter, sku: string): Promise<TrendPoint[]> {
+  const w = windowOf(f);
+  const rows = await q<{ label: string; date: string; amazon: string; flipkart: string; shopify: string }>(
+    `SELECT to_char(d.day,'DD Mon') label, to_char(d.day,'YYYY-MM-DD') date,
+       coalesce(sum(oi.qty*oi.unit_price) filter (where o.channel='amazon'),0) amazon,
+       coalesce(sum(oi.qty*oi.unit_price) filter (where o.channel='flipkart'),0) flipkart,
+       coalesce(sum(oi.qty*oi.unit_price) filter (where o.channel='shopify'),0) shopify
+     FROM generate_series($1::date, $2::date - 1, '1 day') d(day)
+     LEFT JOIN orders o ON o.order_date::date = d.day
+     LEFT JOIN order_items oi ON oi.channel = o.channel AND oi.order_id = o.order_id AND oi.internal_sku = $3
+     GROUP BY d.day ORDER BY d.day`,
+    [w.start, w.endEx, sku],
   );
   return rows.map((r) => ({ label: r.label, date: r.date, amazon: +r.amazon, flipkart: +r.flipkart, shopify: +r.shopify }));
 }
 
 export async function ordersPerDay(f: Filter): Promise<TrendPoint[]> {
-  const days = Math.min(f.days, 30);
+  const w = windowOf(f);
+  // cap the chart at the last 30 days of the window
+  const startMs = Math.max(Date.parse(w.start), Date.parse(w.endEx) - 30 * 86_400_000);
+  const start = new Date(startMs).toISOString().slice(0, 10);
   const rows = await q<{ label: string; date: string; amazon: string; flipkart: string; shopify: string }>(
     `SELECT to_char(d.day,'DD Mon') label, to_char(d.day,'YYYY-MM-DD') date,
        count(o.*) filter (where o.channel='amazon') amazon,
        count(o.*) filter (where o.channel='flipkart') flipkart,
        count(o.*) filter (where o.channel='shopify') shopify
-     FROM generate_series((now()-make_interval(days => $1::int))::date, now()::date, '1 day') d(day)
+     FROM generate_series($1::date, $2::date - 1, '1 day') d(day)
      LEFT JOIN orders o ON o.order_date::date = d.day
      GROUP BY d.day ORDER BY d.day`,
-    [days],
+    [start, w.endEx],
   );
   return rows.map((r) => ({ label: r.label, date: r.date, amazon: +r.amazon, flipkart: +r.flipkart, shopify: +r.shopify }));
 }
 
 export async function salesKpis(f: Filter): Promise<Kpi[]> {
-  const { clause, params } = ch(f);
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 4);
   const row = await q1<{ rev: string; prev_rev: string; ord: string; prev_ord: string; units: string; prev_units: string }>(
     `SELECT
-       coalesce(sum(total_value) filter (where order_date >= now()-make_interval(days => $1::int)),0) rev,
-       coalesce(sum(total_value) filter (where order_date <  now()-make_interval(days => $1::int)),0) prev_rev,
-       count(*) filter (where order_date >= now()-make_interval(days => $1::int)) ord,
-       count(*) filter (where order_date <  now()-make_interval(days => $1::int)) prev_ord,
+       coalesce(sum(total_value) filter (where order_date >= $2::timestamptz),0) rev,
+       coalesce(sum(total_value) filter (where order_date <  $2::timestamptz),0) prev_rev,
+       count(*) filter (where order_date >= $2::timestamptz) ord,
+       count(*) filter (where order_date <  $2::timestamptz) prev_ord,
        coalesce((select sum(qty) from order_items oi join orders o2 using(channel,order_id)
-                 where o2.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o2.channel")}),0) units,
+                 where o2.order_date >= $2::timestamptz and o2.order_date < $3::timestamptz ${clause.replace("channel", "o2.channel")}),0) units,
        coalesce((select sum(qty) from order_items oi join orders o2 using(channel,order_id)
-                 where o2.order_date < now()-make_interval(days => $1::int) and o2.order_date >= now()-make_interval(days => 2 * $1::int) ${clause.replace("channel", "o2.channel")}),0) prev_units
-     FROM orders WHERE order_date >= now()-make_interval(days => 2 * $1::int) ${clause}`,
-    [f.days, ...params],
+                 where o2.order_date >= $1::timestamptz and o2.order_date < $2::timestamptz ${clause.replace("channel", "o2.channel")}),0) prev_units
+     FROM orders WHERE order_date >= $1::timestamptz AND order_date < $3::timestamptz ${clause}`,
+    [w.prevStart, w.start, w.endEx, ...params],
   );
   const rev = +row.rev, prevRev = +row.prev_rev, ord = +row.ord, prevOrd = +row.prev_ord;
   const units = +row.units, prevUnits = +row.prev_units;
@@ -187,21 +220,22 @@ export async function salesKpis(f: Filter): Promise<Kpi[]> {
 }
 
 export async function recentOrders(f: Filter, limit = 12): Promise<{ rows: OrderRow[]; total: number }> {
-  const { clause, params } = ch(f);
-  const rows = await q<{ id: string; channel: Channel; date: string; status: string; region: string; value: string; name: string; qty: string }>(
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
+  const rows = await q<{ id: string; channel: Channel; date: string; status: string; region: string; value: string; name: string; sku: string | null; qty: string }>(
     `SELECT o.order_id id, o.channel, o.order_date date, o.status, o.buyer_region region, o.total_value value,
-       coalesce(li.name,'—') name, coalesce(it.qty,0) qty
+       coalesce(li.name,'—') name, li.sku sku, coalesce(it.qty,0) qty
      FROM orders o
      LEFT JOIN LATERAL (SELECT sum(qty) qty FROM order_items WHERE channel=o.channel AND order_id=o.order_id) it ON true
-     LEFT JOIN LATERAL (SELECT sm.product_name name FROM order_items oi JOIN sku_master sm ON sm.internal_sku=oi.internal_sku
+     LEFT JOIN LATERAL (SELECT sm.product_name name, oi.internal_sku sku FROM order_items oi JOIN sku_master sm ON sm.internal_sku=oi.internal_sku
                         WHERE oi.channel=o.channel AND oi.order_id=o.order_id ORDER BY oi.line_no LIMIT 1) li ON true
-     WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}
+     WHERE o.order_date >= $1::timestamptz AND o.order_date < $2::timestamptz ${clause.replace("channel", "o.channel")}
      ORDER BY o.order_date DESC LIMIT ${Number(limit)}`,
-    [f.days, ...params],
+    [w.start, w.endEx, ...params],
   );
   const cnt = await q1<{ n: string }>(
-    `SELECT count(*) n FROM orders WHERE order_date >= now()-make_interval(days => $1::int) ${clause}`,
-    [f.days, ...params],
+    `SELECT count(*) n FROM orders WHERE order_date >= $1::timestamptz AND order_date < $2::timestamptz ${clause}`,
+    [w.start, w.endEx, ...params],
   );
   return {
     total: +cnt.n,
@@ -209,7 +243,7 @@ export async function recentOrders(f: Filter, limit = 12): Promise<{ rows: Order
       id: r.id.startsWith("#") ? r.id : "#" + r.id,
       channel: r.channel,
       date: new Date(r.date).toISOString(),
-      sku: "",
+      sku: r.sku || "",
       name: r.name,
       qty: +r.qty,
       value: +r.value,
@@ -220,15 +254,16 @@ export async function recentOrders(f: Filter, limit = 12): Promise<{ rows: Order
 }
 
 export async function topProducts(f: Filter, limit = 5): Promise<TopProduct[]> {
-  const { clause, params } = ch(f);
-  const rows = await q<{ name: string; value: string; units: string }>(
-    `SELECT sm.product_name name, coalesce(sum(oi.qty*oi.unit_price),0) value, coalesce(sum(oi.qty),0) units
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
+  const rows = await q<{ sku: string; name: string; value: string; units: string }>(
+    `SELECT oi.internal_sku sku, sm.product_name name, coalesce(sum(oi.qty*oi.unit_price),0) value, coalesce(sum(oi.qty),0) units
      FROM order_items oi JOIN orders o USING(channel,order_id) JOIN sku_master sm ON sm.internal_sku=oi.internal_sku
-     WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}
-     GROUP BY sm.product_name ORDER BY value DESC LIMIT ${Number(limit)}`,
-    [f.days, ...params],
+     WHERE o.order_date >= $1::timestamptz AND o.order_date < $2::timestamptz ${clause.replace("channel", "o.channel")}
+     GROUP BY oi.internal_sku, sm.product_name ORDER BY value DESC LIMIT ${Number(limit)}`,
+    [w.start, w.endEx, ...params],
   );
-  return rows.map((r) => ({ name: r.name, value: +r.value, units: +r.units, avgPrice: +r.units ? +r.value / +r.units : 0 }));
+  return rows.map((r) => ({ sku: r.sku, name: r.name, value: +r.value, units: +r.units, avgPrice: +r.units ? +r.value / +r.units : 0 }));
 }
 
 export async function stockHealth(f: Filter): Promise<StockRow[]> {
@@ -301,25 +336,26 @@ export async function wasted(): Promise<WastedRow[]> {
 /**
  * SKU-wise returns for the selected window & channel. Rate divides returned
  * units by units SOLD IN THE SAME WINDOW — a matched-window rate, so the
- * 7/30/90D toggle actually changes it. Top reason is quantity-weighted and
+ * range toggle actually changes it. Top reason is quantity-weighted and
  * windowed too.
  */
 export async function returns(f: Filter): Promise<ReturnRow[]> {
-  const { clause, params } = ch(f);
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
   const rows = await q<{ sku: string; name: string; units: string; sold: string; reason: string | null }>(
     `WITH ret AS (
        SELECT internal_sku, sum(qty) units
-       FROM returns WHERE return_date >= (now()-make_interval(days => $1::int))::date ${clause}
+       FROM returns WHERE return_date >= $1::date AND return_date < $2::date ${clause}
        GROUP BY internal_sku
      ), sold AS (
        SELECT oi.internal_sku, sum(oi.qty) units
        FROM order_items oi JOIN orders o USING(channel,order_id)
-       WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}
+       WHERE o.order_date >= $1::timestamptz AND o.order_date < $2::timestamptz ${clause.replace("channel", "o.channel")}
        GROUP BY oi.internal_sku
      ), reason AS (
        SELECT DISTINCT ON (internal_sku) internal_sku, reason FROM (
          SELECT internal_sku, coalesce(reason,'Unspecified') reason, sum(qty) n
-         FROM returns WHERE return_date >= (now()-make_interval(days => $1::int))::date ${clause}
+         FROM returns WHERE return_date >= $1::date AND return_date < $2::date ${clause}
          GROUP BY internal_sku, coalesce(reason,'Unspecified')
        ) x ORDER BY internal_sku, n DESC
      )
@@ -328,7 +364,7 @@ export async function returns(f: Filter): Promise<ReturnRow[]> {
      JOIN sku_master sm ON sm.internal_sku = r.internal_sku
      LEFT JOIN sold s ON s.internal_sku = r.internal_sku
      LEFT JOIN reason re ON re.internal_sku = r.internal_sku`,
-    [f.days, ...params],
+    [w.start, w.endEx, ...params],
   );
   return rows
     .map((r) => ({
@@ -347,26 +383,26 @@ export async function returns(f: Filter): Promise<ReturnRow[]> {
 const RATE_MIN_SOLD = 3;
 
 export async function returnsKpis(f: Filter): Promise<Kpi[]> {
-  const { clause, params } = ch(f);
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
   const totals = await q1<{ returned: string; sold: string }>(
     `SELECT
        (SELECT coalesce(sum(qty),0) FROM returns
-        WHERE return_date >= (now()-make_interval(days => $1::int))::date ${clause}) returned,
+        WHERE return_date >= $1::date AND return_date < $2::date ${clause}) returned,
        (SELECT coalesce(sum(oi.qty),0) FROM order_items oi JOIN orders o USING(channel,order_id)
-        WHERE o.order_date >= now()-make_interval(days => $1::int) ${clause.replace("channel", "o.channel")}) sold`,
-    [f.days, ...params],
+        WHERE o.order_date >= $1::timestamptz AND o.order_date < $2::timestamptz ${clause.replace("channel", "o.channel")}) sold`,
+    [w.start, w.endEx, ...params],
   );
   const returned = +totals.returned, sold = +totals.sold;
   const accountRate = sold > 0 ? (returned / sold) * 100 : 0;
   const data = await returns(f);
   const topByUnits = [...data].sort((a, b) => b.units - a.units)[0];
   const worst = data.filter((d) => d.sold >= RATE_MIN_SOLD)[0];
-  const reasons = await returnReasons(f);
   const qs = buildQuery(f);
   const and = qs ? "&" : "?";
   return [
     { label: "Account Return Rate", value: sold ? pct(accountRate) : "—", sub: `${num(returned)} of ${num(sold)} units sold`, href: `/drilldown/returns${qs}` },
-    { label: "Units Returned", value: num(returned), sub: `last ${f.days} days`, href: `/drilldown/returns${qs}` },
+    { label: "Units Returned", value: num(returned), sub: windowLabel(f), href: `/drilldown/returns${qs}` },
     { label: "Top SKU Returns", value: topByUnits ? num(topByUnits.units) : "—", sub: topByUnits ? topByUnits.sku : "no returns in window", href: topByUnits ? `/drilldown/returns${qs}${and}q=${encodeURIComponent(topByUnits.sku)}` : `/drilldown/returns${qs}` },
     { label: "Highest Return Rate", value: worst ? worst.rate.toFixed(1) + "%" : "—", sub: worst ? `${worst.sku} · ≥${RATE_MIN_SOLD} sold` : `no SKU with ≥${RATE_MIN_SOLD} sold`, href: worst ? `/drilldown/returns${qs}${and}q=${encodeURIComponent(worst.sku)}` : `/drilldown/returns${qs}` },
   ];
@@ -374,14 +410,15 @@ export async function returnsKpis(f: Filter): Promise<Kpi[]> {
 
 /** Returns drill-down: every individual return event in the window. */
 export async function returnLines(f: Filter, limit = 2000): Promise<ReturnLineRow[]> {
-  const { clause, params } = ch(f);
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
   const rows = await q<{ id: string; channel: Channel; date: string; sku: string; name: string | null; qty: string; reason: string | null }>(
     `SELECT r.return_id id, r.channel, r.return_date date, r.internal_sku sku,
        sm.product_name name, r.qty, r.reason
      FROM returns r LEFT JOIN sku_master sm ON sm.internal_sku = r.internal_sku
-     WHERE r.return_date >= (now()-make_interval(days => $1::int))::date ${clause.replace("channel", "r.channel")}
+     WHERE r.return_date >= $1::date AND r.return_date < $2::date ${clause.replace("channel", "r.channel")}
      ORDER BY r.return_date DESC LIMIT ${Number(limit)}`,
-    [f.days, ...params],
+    [w.start, w.endEx, ...params],
   );
   return rows.map((r) => ({
     id: r.id,
@@ -395,12 +432,13 @@ export async function returnLines(f: Filter, limit = 2000): Promise<ReturnLineRo
 }
 
 export async function returnReasons(f: Filter): Promise<ReturnReason[]> {
-  const { clause, params } = ch(f);
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
   const rows = await q<{ reason: string; n: string }>(
     `SELECT coalesce(reason,'Unspecified') reason, sum(qty) n FROM returns
-     WHERE return_date >= (now()-make_interval(days => $1::int))::date ${clause}
+     WHERE return_date >= $1::date AND return_date < $2::date ${clause}
      GROUP BY coalesce(reason,'Unspecified') ORDER BY n DESC LIMIT 6`,
-    [f.days, ...params],
+    [w.start, w.endEx, ...params],
   );
   const total = rows.reduce((a, r) => a + +r.n, 0) || 1;
   return rows.map((r, i) => ({ reason: r.reason, share: Math.round((+r.n / total) * 100), color: REASON_COLORS[i % REASON_COLORS.length] }));

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { claudeAnswer } from "@/lib/data";
-import { ChannelFilter, Filter, RangeDays } from "@/lib/types";
+import { ChannelFilter, Filter } from "@/lib/types";
 import { anthropicReady, runInsight } from "@/lib/insights";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +23,9 @@ function parseBody(body: Record<string, unknown>): { question: string; filter: F
   )
     ? (channelRaw as ChannelFilter)
     : "all";
+  // any window length is fine here (presets or a custom from→to span)
   const daysRaw = Number(body.days);
-  const days: RangeDays = ([7, 30, 90] as const).includes(daysRaw as RangeDays) ? (daysRaw as RangeDays) : 30;
+  const days = Number.isInteger(daysRaw) && daysRaw >= 1 && daysRaw <= 366 ? daysRaw : 30;
   return { question, filter: { channel, days } };
 }
 

@@ -1,4 +1,4 @@
-import { parseFilter } from "@/lib/filter";
+import { parseFilter, windowLabel } from "@/lib/filter";
 import { getReturnsKpis, getReturns, getReturnReasons } from "@/lib/queries";
 import { KpiGrid, Card } from "@/components/ui";
 import { ReasonsDonut } from "@/components/charts";
@@ -25,7 +25,7 @@ export default async function ReturnsPage({
     <>
       <KpiGrid kpis={kpis} />
       <div className="grid g-3 mt">
-        <Card title="Return Reasons" sub={`Share of returned units · last ${f.days} days`}>
+        <Card title="Return Reasons" sub={`Share of returned units · ${windowLabel(f)}`}>
           {reasons.length ? (
             <>
               <ReasonsDonut data={reasons} />
@@ -52,6 +52,7 @@ export default async function ReturnsPage({
             cols={RETURN_COLS}
             filename={`zensil-returns-${f.channel}-${f.days}d`}
             initialSort={{ key: "units", dir: "desc" }}
+            linkTo={{ base: "/products", key: "sku" }}
           />
         </Card>
       </div>

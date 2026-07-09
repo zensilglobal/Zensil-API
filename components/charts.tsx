@@ -36,17 +36,25 @@ function useDayDrill(data: TrendPoint[]) {
   };
 }
 
-const COLORS = { amazon: "#d4af37", flipkart: "#3f8fe0", shopify: "#5fb87a" };
-const GRID = "rgba(255,255,255,.05)";
-const TICK = "#8a857c";
+/* All chart colors resolve from CSS custom properties so the palette
+   follows the active light/dark theme (SVG fill/stroke accept var()). */
+const COLORS = {
+  amazon: "var(--color-amazon)",
+  flipkart: "var(--color-flipkart)",
+  shopify: "var(--color-shopify)",
+};
+const GRID = "var(--chart-grid)";
+const TICK = "var(--chart-tick)";
 
 const tooltipStyle = {
-  background: "#111114",
-  border: "1px solid rgba(212,175,55,.32)",
-  borderRadius: 10,
+  background: "var(--tooltip-bg)",
+  border: "1px solid var(--line-strong)",
+  borderRadius: 12,
   fontSize: 12,
-  color: "#f3efe6",
+  color: "var(--text)",
+  boxShadow: "var(--shadow)",
 };
+const tooltipLabel = { color: "var(--text-dim)" };
 
 function activeChannels(channel: ChannelFilter): (keyof typeof COLORS)[] {
   if (channel === "all") return ["amazon", "flipkart", "shopify"];
@@ -71,7 +79,7 @@ export function RevenueTrend({ data, channel }: { data: TrendPoint[]; channel: C
           <CartesianGrid stroke={GRID} vertical={false} />
           <XAxis dataKey="label" stroke={TICK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={24} />
           <YAxis stroke={TICK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => inrK(v)} width={56} />
-          <Tooltip contentStyle={tooltipStyle} formatter={(v) => inr(Number(v))} labelStyle={{ color: "#a9a39a" }} />
+          <Tooltip contentStyle={tooltipStyle} formatter={(v) => inr(Number(v))} labelStyle={tooltipLabel} />
           {chans.map((c) => (
             <Area key={c} type="monotone" dataKey={c} name={c[0].toUpperCase() + c.slice(1)} stroke={COLORS[c]} strokeWidth={2} fill={`url(#g-${c})`} />
           ))}
@@ -91,7 +99,7 @@ export function OrdersBar({ data, channel }: { data: TrendPoint[]; channel: Chan
           <CartesianGrid stroke={GRID} vertical={false} />
           <XAxis dataKey="label" stroke={TICK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={20} />
           <YAxis stroke={TICK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
-          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(212,175,55,.05)" }} labelStyle={{ color: "#a9a39a" }} />
+          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--chart-cursor)" }} labelStyle={tooltipLabel} />
           {chans.map((c) => (
             <Bar key={c} dataKey={c} name={c[0].toUpperCase() + c.slice(1)} stackId="s" fill={COLORS[c]} radius={[3, 3, 0, 0]} />
           ))}
@@ -111,7 +119,7 @@ export function ChannelDonut({ split }: { split: ChannelSplit }) {
     <div style={{ height: 210 }}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie data={data} dataKey="value" nameKey="name" innerRadius={58} outerRadius={88} paddingAngle={2} stroke="#0c0c0e" strokeWidth={3}>
+          <Pie data={data} dataKey="value" nameKey="name" innerRadius={58} outerRadius={88} paddingAngle={2} stroke="var(--donut-stroke)" strokeWidth={3}>
             {data.map((d) => (
               <Cell key={d.name} fill={d.color} />
             ))}
@@ -128,7 +136,7 @@ export function ReasonsDonut({ data }: { data: { reason: string; share: number; 
     <div style={{ height: 210 }}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie data={data} dataKey="share" nameKey="reason" innerRadius={52} outerRadius={84} paddingAngle={2} stroke="#0c0c0e" strokeWidth={3}>
+          <Pie data={data} dataKey="share" nameKey="reason" innerRadius={52} outerRadius={84} paddingAngle={2} stroke="var(--donut-stroke)" strokeWidth={3}>
             {data.map((d) => (
               <Cell key={d.reason} fill={d.color} />
             ))}

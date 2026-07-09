@@ -1,4 +1,5 @@
-import { parseFilter } from "@/lib/filter";
+import Link from "next/link";
+import { parseFilter, buildQuery } from "@/lib/filter";
 import { getSalesKpis, getOrdersPerDay, getRecentOrders } from "@/lib/queries";
 import { inr, num, dayLabel } from "@/lib/format";
 import { KpiGrid, Card, ChannelChip, StatusPill } from "@/components/ui";
@@ -48,7 +49,15 @@ export default async function SalesPage({
                     <td>
                       <ChannelChip channel={o.channel} />
                     </td>
-                    <td className="strong truncate-cell">{o.name}</td>
+                    <td className="strong truncate-cell">
+                      {o.sku ? (
+                        <Link className="plink" href={`/products/${encodeURIComponent(o.sku)}${buildQuery(f)}`}>
+                          {o.name}
+                        </Link>
+                      ) : (
+                        o.name
+                      )}
+                    </td>
                     <td className="right num">{o.qty}</td>
                     <td className="right num strong">{inr(o.value)}</td>
                     <td>{o.region}</td>

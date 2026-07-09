@@ -20,7 +20,7 @@ import {
   Kpi,
 } from "./types";
 import { inr, inrK, num, pct, deltaPct, channelName } from "./format";
-import { buildQuery } from "./filter";
+import { buildQuery, windowOf, windowLabel } from "./filter";
 
 /* =====================================================================
    DATA LAYER
@@ -76,12 +76,13 @@ const wasted: WastedRow[] = [
   { term: "journal notebook a5", spend: 760, clicks: 121, orders: 1 },
 ];
 
+// theme-aware categorical palette (defined per theme in globals.css)
 const returnReasons: ReturnReason[] = [
-  { reason: "Damaged in transit", share: 34, color: "#c22222" },
-  { reason: "Not as described", share: 24, color: "#d4af37" },
-  { reason: "Quality issue", share: 19, color: "#1f7a4d" },
-  { reason: "Wrong item", share: 13, color: "#3f8fe0" },
-  { reason: "Changed mind", share: 10, color: "#7a7a82" },
+  { reason: "Damaged in transit", share: 34, color: "var(--cat-1)" },
+  { reason: "Not as described", share: 24, color: "var(--cat-2)" },
+  { reason: "Quality issue", share: 19, color: "var(--cat-3)" },
+  { reason: "Wrong item", share: 13, color: "var(--cat-4)" },
+  { reason: "Changed mind", share: 10, color: "var(--cat-5)" },
 ];
 
 const regions = ["Maharashtra", "Karnataka", "Delhi NCR", "Tamil Nadu", "Gujarat", "West Bengal", "Telangana", "UP"];
@@ -135,19 +136,20 @@ const ALL_ORDERS: OrderRow[] = (() => {
 function inChannel(o: OrderRow, ch: ChannelFilter): boolean {
   return ch === "all" || o.channel === ch;
 }
+/* preset windows anchor at BASE (the sample data's "today");
+   a custom from/to window uses its absolute dates */
 function windowOrders(f: Filter): OrderRow[] {
-  const cutoff = new Date(BASE);
-  cutoff.setUTCDate(BASE.getUTCDate() - f.days);
-  return ALL_ORDERS.filter((o) => new Date(o.date) >= cutoff && inChannel(o, f.channel));
+  const w = windowOf(f, BASE);
+  return ALL_ORDERS.filter((o) => {
+    const d = o.date.slice(0, 10);
+    return d >= w.start && d < w.endEx && inChannel(o, f.channel);
+  });
 }
 function prevWindowOrders(f: Filter): OrderRow[] {
-  const end = new Date(BASE);
-  end.setUTCDate(BASE.getUTCDate() - f.days);
-  const start = new Date(end);
-  start.setUTCDate(end.getUTCDate() - f.days);
+  const w = windowOf(f, BASE);
   return ALL_ORDERS.filter((o) => {
-    const dt = new Date(o.date);
-    return dt >= start && dt < end && inChannel(o, f.channel);
+    const d = o.date.slice(0, 10);
+    return d >= w.prevStart && d < w.start && inChannel(o, f.channel);
   });
 }
 const sum = (arr: OrderRow[], fn: (o: OrderRow) => number) => arr.reduce((a, b) => a + fn(b), 0);
@@ -219,21 +221,22 @@ export function getOrderLines(f: Filter): OrderLineRow[] {
     .sort((a, b) => +new Date(b.date) - +new Date(a.date));
 }
 
-export function getTrend(f: Filter): TrendPoint[] {
-  const step = f.days > 30 ? 3 : 1;
+function trendPoints(f: Filter, orders: OrderRow[]): TrendPoint[] {
+  const DAY = 86_400_000;
+  const w = windowOf(f, BASE);
+  const step = w.days > 30 ? 3 : 1;
+  const startT = Date.parse(w.start + "T00:00:00Z");
+  const endT = Date.parse(w.endEx + "T00:00:00Z");
   const points: TrendPoint[] = [];
-  for (let d = f.days - 1; d >= 0; d -= step) {
-    const dt = new Date(BASE);
-    dt.setUTCDate(BASE.getUTCDate() - d);
-    const lo = new Date(dt);
-    const hi = new Date(dt);
-    hi.setUTCDate(dt.getUTCDate() + step);
-    const slice = ALL_ORDERS.filter((o) => {
-      const od = new Date(o.date);
-      return od >= lo && od < hi;
+  for (let t = startT; t < endT; t += step * DAY) {
+    const hi = Math.min(t + step * DAY, endT);
+    const slice = orders.filter((o) => {
+      const od = +new Date(o.date);
+      return od >= t && od < hi;
     });
+    const dt = new Date(t);
     points.push({
-      label: dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" }),
+      label: dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "UTC" }),
       date: dt.toISOString().slice(0, 10),
       amazon: sum(slice.filter((o) => o.channel === "amazon"), (o) => o.value),
       flipkart: sum(slice.filter((o) => o.channel === "flipkart"), (o) => o.value),
@@ -243,20 +246,29 @@ export function getTrend(f: Filter): TrendPoint[] {
   return points;
 }
 
+export function getTrend(f: Filter): TrendPoint[] {
+  return trendPoints(f, ALL_ORDERS);
+}
+
+/** Revenue trend for one SKU — powers the product-detail page. */
+export function getSkuTrend(f: Filter, sku: string): TrendPoint[] {
+  return trendPoints(f, ALL_ORDERS.filter((o) => o.sku === sku));
+}
+
 export function getChannelSplit(f: Filter): ChannelSplit {
   return splitOf(windowOrders(f));
 }
 
 export function getTopProducts(f: Filter, limit = 5): TopProduct[] {
   const cur = windowOrders(f);
-  const by: Record<string, { value: number; units: number }> = {};
+  const by: Record<string, { sku: string; value: number; units: number }> = {};
   cur.forEach((o) => {
-    const t = (by[o.name] ||= { value: 0, units: 0 });
+    const t = (by[o.name] ||= { sku: o.sku, value: 0, units: 0 });
     t.value += o.value;
     t.units += o.qty;
   });
   return Object.entries(by)
-    .map(([name, t]) => ({ name, value: t.value, units: t.units, avgPrice: t.units ? t.value / t.units : 0 }))
+    .map(([name, t]) => ({ sku: t.sku, name, value: t.value, units: t.units, avgPrice: t.units ? t.value / t.units : 0 }))
     .sort((a, b) => b.value - a.value)
     .slice(0, limit);
 }
@@ -280,15 +292,20 @@ export function getSalesKpis(f: Filter): Kpi[] {
 }
 
 export function getOrdersPerDay(f: Filter): TrendPoint[] {
-  const days = Math.min(f.days, 30);
+  const DAY = 86_400_000;
+  const w = windowOf(f, BASE);
+  const endT = Date.parse(w.endEx + "T00:00:00Z");
+  // cap the chart at the last 30 days of the window
+  const startT = Math.max(Date.parse(w.start + "T00:00:00Z"), endT - 30 * DAY);
   const points: TrendPoint[] = [];
-  for (let d = days - 1; d >= 0; d--) {
-    const dt = new Date(BASE);
-    dt.setUTCDate(BASE.getUTCDate() - d);
-    const dayKey = dt.toDateString();
-    const slice = ALL_ORDERS.filter((o) => new Date(o.date).toDateString() === dayKey);
+  for (let t = startT; t < endT; t += DAY) {
+    const slice = ALL_ORDERS.filter((o) => {
+      const od = +new Date(o.date);
+      return od >= t && od < t + DAY;
+    });
+    const dt = new Date(t);
     points.push({
-      label: dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" }),
+      label: dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "UTC" }),
       date: dt.toISOString().slice(0, 10),
       amazon: slice.filter((o) => o.channel === "amazon").length,
       flipkart: slice.filter((o) => o.channel === "flipkart").length,
@@ -383,7 +400,7 @@ export function getReturnsKpis(f: Filter): Kpi[] {
   const and = qs ? "&" : "?";
   return [
     { label: "Account Return Rate", value: sold ? pct(accountRate) : "—", sub: `${num(returned)} of ${num(sold)} units sold`, href: `/drilldown/returns${qs}` },
-    { label: "Units Returned", value: num(returned), sub: `last ${f.days} days`, href: `/drilldown/returns${qs}` },
+    { label: "Units Returned", value: num(returned), sub: windowLabel(f), href: `/drilldown/returns${qs}` },
     { label: "Top SKU Returns", value: topByUnits ? num(topByUnits.units) : "—", sub: topByUnits?.sku || "no returns in window", href: topByUnits ? `/drilldown/returns${qs}${and}q=${encodeURIComponent(topByUnits.sku)}` : `/drilldown/returns${qs}` },
     { label: "Highest Return Rate", value: worst ? worst.rate.toFixed(1) + "%" : "—", sub: worst ? `${worst.sku} · ≥3 sold` : "no SKU with ≥3 sold", href: worst ? `/drilldown/returns${qs}${and}q=${encodeURIComponent(worst.sku)}` : `/drilldown/returns${qs}` },
   ];
@@ -393,10 +410,12 @@ export function getReturnLines(f: Filter): ReturnLineRow[] {
   // synthesize deterministic per-unit return events from the SKU aggregates
   const out: ReturnLineRow[] = [];
   const chans: Channel[] = ["amazon", "flipkart", "shopify"];
+  const w = windowOf(f, BASE);
+  const endT = Date.parse(w.endEx + "T00:00:00Z");
   getReturns(f).forEach((r) => {
     for (let i = 0; i < r.units; i++) {
-      const date = new Date(BASE);
-      date.setUTCDate(BASE.getUTCDate() - ((i * 7 + Math.floor(rndStable(r.sku) * 10)) % f.days));
+      const back = 1 + ((i * 7 + Math.floor(rndStable(r.sku) * 10)) % w.days);
+      const date = new Date(endT - back * 86_400_000);
       const reason = returnReasons[Math.floor(rndStable(r.sku + i) * returnReasons.length)].reason;
       const chan = f.channel === "all" ? chans[Math.floor(rndStable(r.sku + "c" + i) * chans.length)] : f.channel;
       out.push({

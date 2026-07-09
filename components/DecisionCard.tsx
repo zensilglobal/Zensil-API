@@ -15,7 +15,12 @@ export function askHref(ask: string, f: Filter): string {
   const p = new URLSearchParams();
   p.set("q", ask);
   if (f.channel !== "all") p.set("channel", f.channel);
-  if (f.days !== 30) p.set("days", String(f.days));
+  if (f.from && f.to) {
+    p.set("from", f.from);
+    p.set("to", f.to);
+  } else if (f.days !== 30) {
+    p.set("days", String(f.days));
+  }
   return `/insights?${p.toString()}`;
 }
 

@@ -10,6 +10,8 @@ const live = warehouseEnabled();
 
 export const getOverviewKpis = (f: Filter) => (live ? wh.overviewKpis(f) : Promise.resolve(mock.getOverviewKpis(f)));
 export const getTrend = (f: Filter) => (live ? wh.trend(f) : Promise.resolve(mock.getTrend(f)));
+export const getSkuTrend = (f: Filter, sku: string) =>
+  live ? wh.skuTrend(f, sku) : Promise.resolve(mock.getSkuTrend(f, sku));
 export const getChannelSplit = (f: Filter) => (live ? wh.channelSplit(f) : Promise.resolve(mock.getChannelSplit(f)));
 export const getTopProducts = (f: Filter, limit?: number) =>
   live ? wh.topProducts(f, limit) : Promise.resolve(mock.getTopProducts(f, limit));

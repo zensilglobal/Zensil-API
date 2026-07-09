@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import {
@@ -11,8 +11,13 @@ import {
   Layers,
   Sparkles,
   Menu,
+  CalendarRange,
+  Check,
+  X,
 } from "lucide-react";
 import { ChannelFilter, RangeDays, SyncStatus } from "@/lib/types";
+import { ZensilLockup } from "@/components/Logo";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const NAV = [
   { href: "/", label: "Overview", icon: LayoutGrid, group: "Command" },
@@ -46,7 +51,13 @@ const CHANNELS: { id: ChannelFilter; label: string; color?: string }[] = [
   { id: "flipkart", label: "Flipkart", color: "var(--color-flipkart)" },
   { id: "shopify", label: "Shopify", color: "var(--color-shopify)" },
 ];
-const RANGES: RangeDays[] = [7, 30, 90];
+const RANGES: RangeDays[] = [7, 15, 30, 90];
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function niceDate(d: string): string {
+  return new Date(d + "T00:00:00Z").toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "UTC" });
+}
 
 export default function AppFrame({
   children,
@@ -72,15 +83,48 @@ export default function AppFrame({
   }, [router]);
 
   const channel = (searchParams.get("channel") as ChannelFilter) || "all";
-  const days = (Number(searchParams.get("days")) || 30) as RangeDays;
-  const title = TITLES[pathname] ?? { t: "Zensil Ops", s: "" };
+  const from = searchParams.get("from") || "";
+  const to = searchParams.get("to") || "";
+  const customActive = !!(from && to && DATE_RE.test(from) && DATE_RE.test(to) && from <= to);
+  const days = customActive ? 0 : Number(searchParams.get("days")) || 30;
 
-  function withParam(key: string, value: string) {
+  const title = pathname.startsWith("/products/")
+    ? { t: "Product Detail", s: "Everything about one SKU — sales, stock, ads context & returns" }
+    : (TITLES[pathname] ?? { t: "Zensil Ops", s: "" });
+
+  function apply(mutate: (p: URLSearchParams) => void) {
     const p = new URLSearchParams(searchParams.toString());
-    if ((key === "channel" && value === "all") || (key === "days" && value === "30")) p.delete(key);
-    else p.set(key, value);
+    mutate(p);
     const qs = p.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
+  function setChannel(value: ChannelFilter) {
+    apply((p) => (value === "all" ? p.delete("channel") : p.set("channel", value)));
+  }
+
+  function setDays(value: RangeDays) {
+    apply((p) => {
+      p.delete("from");
+      p.delete("to");
+      if (value === 30) p.delete("days");
+      else p.set("days", String(value));
+    });
+  }
+
+  function setCustom(f: string, t: string) {
+    apply((p) => {
+      p.delete("days");
+      p.set("from", f);
+      p.set("to", t);
+    });
+  }
+
+  function clearCustom() {
+    apply((p) => {
+      p.delete("from");
+      p.delete("to");
+    });
   }
 
   function navHref(href: string) {
@@ -88,17 +132,36 @@ export default function AppFrame({
     return qs ? `${href}?${qs}` : href;
   }
 
+  /* ---------- custom range popover ---------- */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [draftFrom, setDraftFrom] = useState(from);
+  const [draftTo, setDraftTo] = useState(to);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [pickerOpen]);
+
+  function openPicker() {
+    setDraftFrom(from || new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10));
+    setDraftTo(to || new Date().toISOString().slice(0, 10));
+    setPickerOpen((o) => !o);
+  }
+
+  const draftValid = DATE_RE.test(draftFrom) && DATE_RE.test(draftTo) && draftFrom <= draftTo;
+
   return (
     <div className="app">
       <aside className={`sidebar ${open ? "open" : ""}`}>
         <div className="brand">
-          <div className="crest">
-            <div className="mark">Z</div>
-            <div className="word">
-              <b>ZENSIL</b>
-              <span>Ops Console</span>
-            </div>
-          </div>
+          <Link href={navHref("/")} aria-label="Zensil — Overview">
+            <ZensilLockup size={44} />
+          </Link>
         </div>
         <nav className="nav">
           {["Command", "Intelligence"].map((group) => (
@@ -132,7 +195,7 @@ export default function AppFrame({
           <div className="flex between" style={{ marginTop: 4 }}>
             <span className="tiny muted">Amazon · Flipkart · Shopify</span>
             <form action="/api/logout" method="post">
-              <button type="submit" className="tiny muted" style={{ background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+              <button type="submit" className="tiny muted signout">
                 Sign out
               </button>
             </form>
@@ -153,19 +216,77 @@ export default function AppFrame({
           <div className="spacer" />
           <div className="seg">
             {CHANNELS.map((c) => (
-              <button key={c.id} className={channel === c.id ? "on" : ""} onClick={() => withParam("channel", c.id)}>
+              <button key={c.id} className={channel === c.id ? "on" : ""} onClick={() => setChannel(c.id)}>
                 {c.color && <span className="swatch" style={{ background: c.color }} />}
                 {c.label}
               </button>
             ))}
           </div>
-          <div className="range">
-            {RANGES.map((d) => (
-              <button key={d} className={days === d ? "on" : ""} onClick={() => withParam("days", String(d))}>
-                {d}D
+          <div className="range-wrap" ref={pickerRef}>
+            <div className="range">
+              {RANGES.map((d) => (
+                <button key={d} className={!customActive && days === d ? "on" : ""} onClick={() => setDays(d)}>
+                  {d}D
+                </button>
+              ))}
+              <button className={`custom ${customActive ? "on" : ""}`} onClick={openPicker} aria-expanded={pickerOpen}>
+                <CalendarRange size={13} />
+                {customActive ? `${niceDate(from)} – ${niceDate(to)}` : "Custom"}
               </button>
-            ))}
+            </div>
+            {pickerOpen && (
+              <div className="range-pop">
+                <div className="range-pop-title">Custom date range</div>
+                <div className="range-pop-fields">
+                  <label>
+                    <span>From</span>
+                    <input
+                      type="date"
+                      value={draftFrom}
+                      max={draftTo || undefined}
+                      onChange={(e) => setDraftFrom(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>To</span>
+                    <input
+                      type="date"
+                      value={draftTo}
+                      min={draftFrom || undefined}
+                      onChange={(e) => setDraftTo(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="range-pop-actions">
+                  {customActive && (
+                    <button
+                      type="button"
+                      className="btn ghost tiny"
+                      onClick={() => {
+                        clearCustom();
+                        setPickerOpen(false);
+                      }}
+                    >
+                      <X size={13} /> Clear
+                    </button>
+                  )}
+                  <div className="spacer" />
+                  <button
+                    type="button"
+                    className="btn brand tiny"
+                    disabled={!draftValid}
+                    onClick={() => {
+                      setCustom(draftFrom, draftTo);
+                      setPickerOpen(false);
+                    }}
+                  >
+                    <Check size={13} /> Apply
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+          <ThemeToggle />
         </header>
         <div className="content page-rise" key={pathname + searchParams.toString()}>
           {children}

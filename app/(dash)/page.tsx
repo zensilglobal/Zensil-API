@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { parseFilter } from "@/lib/filter";
+import { parseFilter, buildQuery } from "@/lib/filter";
 import {
   getOverviewKpis,
   getTrend,
@@ -79,9 +79,13 @@ export default async function OverviewPage({
             top.map((p) => (
               <div key={p.name} style={{ marginBottom: 14 }}>
                 <div className="flex between" style={{ marginBottom: 3 }}>
-                  <span className="tiny strong truncate-cell" style={{ maxWidth: 160 }}>
+                  <Link
+                    className="plink tiny strong truncate-cell"
+                    style={{ maxWidth: 160 }}
+                    href={`/products/${encodeURIComponent(p.sku)}${buildQuery(f)}`}
+                  >
                     {p.name}
-                  </span>
+                  </Link>
                   <span className="num tiny">{inrK(p.value)}</span>
                 </div>
                 <div className="tiny muted" style={{ marginBottom: 6 }}>
@@ -91,7 +95,7 @@ export default async function OverviewPage({
                   <i
                     style={{
                       width: `${(p.value / max) * 100}%`,
-                      background: "linear-gradient(90deg,var(--color-crimson),var(--color-gold))",
+                      background: "linear-gradient(90deg,var(--brand),var(--color-gold))",
                     }}
                   />
                 </div>

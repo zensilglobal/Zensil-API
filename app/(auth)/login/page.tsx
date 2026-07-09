@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
+import { ZensilLockup } from "@/components/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,12 +38,8 @@ export default function LoginPage() {
   return (
     <div className="login-wrap">
       <div className="card login-card">
-        <div className="crest" style={{ justifyContent: "center" }}>
-          <div className="mark">Z</div>
-          <div className="word">
-            <b>ZENSIL</b>
-            <span>Ops Console</span>
-          </div>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <ZensilLockup size={52} />
         </div>
         <p className="tiny muted" style={{ textAlign: "center", marginTop: 14 }}>
           Sign in to the operations console
@@ -57,7 +54,7 @@ export default function LoginPage() {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
           </div>
           {err && <div className="login-err">{err}</div>}
-          <button type="submit" className="btn gold" style={{ width: "100%", justifyContent: "center", marginTop: 20, padding: "12px" }} disabled={loading}>
+          <button type="submit" className="btn brand" style={{ width: "100%", justifyContent: "center", marginTop: 20, padding: "12px" }} disabled={loading}>
             <Sparkles size={15} /> {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>

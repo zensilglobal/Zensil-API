@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Info, X } from "lucide-react";
-import { parseFilter, buildQuery } from "@/lib/filter";
+import { parseFilter, buildQuery, windowLabel } from "@/lib/filter";
 import {
   getRevenueBySku,
   getOrderLines,
@@ -66,7 +66,7 @@ async function RevenueDrill({ f }: { f: Filter }) {
   const units = rows.reduce((a, r) => a + r.units, 0);
   const skus = new Set(rows.map((r) => r.sku)).size;
   const kpis = [
-    { label: "Net Revenue", value: inrK(revenue), sub: `last ${f.days} days` },
+    { label: "Net Revenue", value: inrK(revenue), sub: windowLabel(f) },
     { label: "Units Sold", value: num(units), sub: "items" },
     { label: "SKUs Sold", value: num(skus), sub: "with revenue" },
     { label: "Avg Unit Price", value: inr(units ? revenue / units : 0), sub: "revenue ÷ units" },
@@ -84,12 +84,13 @@ async function RevenueDrill({ f }: { f: Filter }) {
     <>
       <KpiGrid kpis={kpis} />
       <div className="mt">
-        <Card title="Revenue by Product" sub="Where every rupee came from — SKU × channel, with units and price">
+        <Card title="Revenue by Product" sub="Where every rupee came from — SKU × channel · click a row for the product detail">
           <DrilldownTable
             rows={rows as unknown as Record<string, string | number>[]}
             cols={cols}
             filename={`zensil-revenue-${f.channel}-${f.days}d`}
             initialSort={{ key: "revenue", dir: "desc" }}
+            linkTo={{ base: "/products", key: "sku" }}
           />
         </Card>
       </div>
@@ -104,9 +105,9 @@ async function OrdersDrill({ f, date }: { f: Filter; date?: string }) {
   const orders = new Set(rows.map((r) => r.id)).size;
   const units = rows.reduce((a, r) => a + r.qty, 0);
   const revenue = rows.reduce((a, r) => a + r.value, 0);
-  const windowLabel = day ? dayLabel(day + "T00:00:00Z") : `last ${f.days} days`;
+  const winLabel = day ? dayLabel(day + "T00:00:00Z") : windowLabel(f);
   const kpis = [
-    { label: "Orders", value: num(orders), sub: windowLabel },
+    { label: "Orders", value: num(orders), sub: winLabel },
     { label: "Units Sold", value: num(units), sub: "items" },
     { label: "Revenue", value: inrK(revenue), sub: "order lines" },
     { label: "Avg Order Value", value: inr(orders ? revenue / orders : 0), sub: "per order" },
@@ -116,12 +117,12 @@ async function OrdersDrill({ f, date }: { f: Filter; date?: string }) {
       <KpiGrid kpis={kpis} />
       <div className="mt">
         <Card
-          title={day ? `Order Lines — ${windowLabel}` : "All Order Lines"}
-          sub="Every order, SKU-wise — product, units, price & status"
+          title={day ? `Order Lines — ${winLabel}` : "All Order Lines"}
+          sub="Every order, SKU-wise — product, units, price & status · click a row for the product detail"
           action={
             day ? (
               <Link className="btn ghost" href={`/drilldown/orders${buildQuery(f)}`}>
-                <X size={15} /> {windowLabel} only — show all days
+                <X size={15} /> {winLabel} only — show all days
               </Link>
             ) : undefined
           }
@@ -131,6 +132,7 @@ async function OrdersDrill({ f, date }: { f: Filter; date?: string }) {
             cols={ORDER_LINE_COLS}
             filename={`zensil-orders-${f.channel}-${day || `${f.days}d`}`}
             initialSort={{ key: "date", dir: "desc" }}
+            linkTo={{ base: "/products", key: "sku" }}
           />
         </Card>
       </div>
@@ -153,7 +155,7 @@ async function AovDrill({ f }: { f: Filter }) {
   const values = rows.map((r) => r.value).sort((a, b) => a - b);
   const median = values.length ? values[Math.floor(values.length / 2)] : 0;
   const kpis = [
-    { label: "Avg Order Value", value: inr(rows.length ? revenue / rows.length : 0), sub: `last ${f.days} days` },
+    { label: "Avg Order Value", value: inr(rows.length ? revenue / rows.length : 0), sub: windowLabel(f) },
     { label: "Median Order", value: inr(median), sub: "typical basket" },
     { label: "Highest Order", value: inr(values.length ? values[values.length - 1] : 0), sub: "single order" },
     { label: "Orders", value: num(rows.length), sub: "behind the average" },
@@ -262,13 +264,14 @@ async function StockDrill({ f, status }: { f: Filter; status?: string }) {
     <>
       <KpiGrid kpis={kpis} />
       <div className="mt">
-        <Card title="Stock Detail" sub="FBA vs Easy Ship units per SKU · days of cover at trailing-14-day velocity">
+        <Card title="Stock Detail" sub="FBA vs Easy Ship units per SKU · days of cover at trailing-14-day velocity · click a row for the product detail">
           <DrilldownTable
             rows={data as unknown as Record<string, string | number>[]}
             cols={cols}
             filename={`zensil-stock-${f.channel}`}
             initialSort={{ key: "cover", dir: "asc" }}
             initialPicks={status === "critical" || status === "low" || status === "healthy" ? { status } : undefined}
+            linkTo={{ base: "/products", key: "sku" }}
           />
         </Card>
       </div>
@@ -299,13 +302,14 @@ async function ReturnsDrill({ f, search }: { f: Filter; search?: string }) {
     <>
       <KpiGrid kpis={kpis} />
       <div className="mt">
-        <Card title="SKU-wise Returns" sub={`Rate = returned ÷ sold in the same ${f.days}-day window`}>
+        <Card title="SKU-wise Returns" sub={`Rate = returned ÷ sold in the same ${f.days}-day window · click a row for the product detail`}>
           <DrilldownTable
             rows={rows as unknown as Record<string, string | number>[]}
             cols={skuCols}
             filename={`zensil-returns-sku-${f.channel}-${f.days}d`}
             initialSort={{ key: "units", dir: "desc" }}
             initialSearch={search}
+            linkTo={{ base: "/products", key: "sku" }}
           />
         </Card>
       </div>
@@ -317,6 +321,7 @@ async function ReturnsDrill({ f, search }: { f: Filter; search?: string }) {
             filename={`zensil-returns-events-${f.channel}-${f.days}d`}
             initialSort={{ key: "date", dir: "desc" }}
             initialSearch={search}
+            linkTo={{ base: "/products", key: "sku" }}
           />
         </Card>
       </div>

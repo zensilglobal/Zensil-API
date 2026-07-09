@@ -19,10 +19,13 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Zensil Ops — Multichannel Data & Decision Platform",
+  title: "Zēnsil Ops — Soul Of Your Kitchen",
   description:
     "Unified operations console across Amazon, Flipkart and Shopify — KPIs, inventory, advertising, returns and Claude-powered decisions.",
 };
+
+// applied before first paint so the saved theme never flashes
+const themeScript = `try{var t=localStorage.getItem("zensil-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
 export default function RootLayout({
   children,
@@ -32,8 +35,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-theme="dark"
+      suppressHydrationWarning
       className={`${cormorant.variable} ${inter.variable} ${jetbrains.variable}`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>{children}</body>
     </html>
   );
