@@ -160,7 +160,7 @@ export default function AppFrame({
       <aside className={`sidebar ${open ? "open" : ""}`}>
         <div className="brand">
           <Link href={navHref("/")} aria-label="Zensil — Overview">
-            <ZensilLockup size={44} />
+            <ZensilLockup size={56} />
           </Link>
         </div>
         <nav className="nav">

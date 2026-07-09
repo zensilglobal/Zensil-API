@@ -39,7 +39,7 @@ export default function LoginPage() {
     <div className="login-wrap">
       <div className="card login-card">
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <ZensilLockup size={52} />
+          <ZensilLockup size={62} />
         </div>
         <p className="tiny muted" style={{ textAlign: "center", marginTop: 14 }}>
           Sign in to the operations console

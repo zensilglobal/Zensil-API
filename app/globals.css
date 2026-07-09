@@ -186,17 +186,7 @@ a { color: inherit; text-decoration: none; }
   background: linear-gradient(90deg, transparent, var(--brand), transparent);
   opacity: 0.55;
 }
-.crest { display: flex; align-items: center; gap: 13px; }
-.crest svg { filter: drop-shadow(0 8px 18px color-mix(in srgb, var(--brand) 45%, transparent)); }
-.crest .word b {
-  font-family: var(--font-serif); font-weight: 700; font-size: 26px; letter-spacing: 0.8px; line-height: 1;
-  background: linear-gradient(92deg, var(--brand-bright), var(--brand) 55%, var(--brand-deep));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.crest .word span {
-  display: block; font-size: 8.6px; letter-spacing: 2.9px; text-transform: uppercase;
-  color: var(--text-faint); margin-top: 4px; font-weight: 600;
-}
+.lockup-img { filter: drop-shadow(0 8px 20px color-mix(in srgb, var(--brand) 35%, transparent)); max-width: 100%; height: auto; }
 .nav { padding: 16px 14px; flex: 1; overflow-y: auto; }
 .nav-label { font-size: 9.5px; letter-spacing: 2.6px; text-transform: uppercase; color: var(--text-faint); font-weight: 700; margin: 10px 12px 9px; }
 .nav-item {
