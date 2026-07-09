@@ -12,6 +12,9 @@ import {
   ReturnRow,
   ReturnLineRow,
   ReturnReason,
+  ReviewRow,
+  SkuReviewAgg,
+  RatingBucket,
   TopProduct,
   ProductRow,
   Decision,
@@ -165,6 +168,112 @@ function splitHtml(orders: OrderRow[]): string {
   const s = splitOf(orders);
   const t = s.amazon + s.flipkart + s.shopify || 1;
   return `<b style="color:var(--color-amazon)">A ${Math.round((s.amazon / t) * 100)}%</b> · <b style="color:var(--color-flipkart)">F ${Math.round((s.flipkart / t) * 100)}%</b> · <b style="color:var(--color-shopify)">S ${Math.round((s.shopify / t) * 100)}%</b>`;
+}
+
+/* ---------- deterministic sample reviews (90 days) ---------- */
+const REVIEW_TEXT: Record<"good" | "mid" | "bad", { title: string; body: string }[]> = {
+  good: [
+    { title: "Absolutely love it", body: "Quality is even better than the photos. Feels premium and works perfectly — already ordered another one." },
+    { title: "Worth every rupee", body: "Beautiful finish and sturdy build. Packaging was excellent and delivery was quick." },
+    { title: "Perfect for my kitchen", body: "Exactly as described. My whole family uses it daily now. Highly recommended." },
+    { title: "Great quality", body: "Very impressed with the material and the attention to detail. Zensil never disappoints." },
+  ],
+  mid: [
+    { title: "Good, but could be better", body: "Does the job well, though the size is slightly smaller than I expected. Decent value overall." },
+    { title: "Okay for the price", body: "Works fine. Finish is nice but the instructions could be clearer." },
+    { title: "Decent product", body: "Average experience — product is fine but delivery took longer than promised." },
+  ],
+  bad: [
+    { title: "Arrived damaged", body: "The item was dented on one side when it arrived. Packaging needs to be much better." },
+    { title: "Not as described", body: "The colour looks different from the listing photos and the build feels flimsy." },
+    { title: "Disappointed", body: "Stopped working properly within a week. Expected much better quality." },
+  ],
+};
+
+const REVIEW_AUTHORS = ["Priya S.", "Rahul M.", "Ananya K.", "Vikram T.", "Sneha R.", "Arjun P.", "Divya N.", "Karan B."];
+
+const ALL_REVIEWS: ReviewRow[] = (() => {
+  let seed = 7;
+  const rnd = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+  const out: ReviewRow[] = [];
+  const chans: Channel[] = ["amazon", "flipkart", "shopify"];
+  products.forEach((p) => {
+    // review volume tracks sales velocity; sentiment is a per-product trait
+    const base = 3.6 + rndStable(p.sku + "sent") * 1.3; // 3.6 .. 4.9
+    const count = Math.max(4, Math.round((p.azVel + p.fkVel + p.shVel) * 3.2));
+    for (let i = 0; i < count; i++) {
+      const rating = Math.max(1, Math.min(5, Math.round(base + (rnd() - 0.5) * 2.6)));
+      const pool = rating >= 4 ? REVIEW_TEXT.good : rating === 3 ? REVIEW_TEXT.mid : REVIEW_TEXT.bad;
+      const t = pool[Math.floor(rnd() * pool.length)];
+      const date = new Date(BASE);
+      date.setUTCDate(BASE.getUTCDate() - Math.floor(rnd() * 90));
+      out.push({
+        id: `${p.sku}-RV${String(i + 1).padStart(3, "0")}`,
+        channel: chans[Math.floor(rnd() * chans.length)],
+        date: date.toISOString().slice(0, 10),
+        sku: p.sku,
+        name: p.name,
+        rating,
+        title: t.title,
+        body: t.body,
+        author: REVIEW_AUTHORS[Math.floor(rnd() * REVIEW_AUTHORS.length)],
+        verified: rnd() < 0.72,
+      });
+    }
+  });
+  return out.sort((a, b) => (a.date < b.date ? 1 : -1));
+})();
+
+function windowReviews(f: Filter): ReviewRow[] {
+  const w = windowOf(f, BASE);
+  return ALL_REVIEWS.filter((r) => r.date >= w.start && r.date < w.endEx && (f.channel === "all" || r.channel === f.channel));
+}
+
+export function getReviews(f: Filter): ReviewRow[] {
+  return windowReviews(f);
+}
+
+export function getReviewKpis(f: Filter): Kpi[] {
+  const cur = windowReviews(f);
+  const w = windowOf(f, BASE);
+  const prev = ALL_REVIEWS.filter((r) => r.date >= w.prevStart && r.date < w.start && (f.channel === "all" || r.channel === f.channel));
+  const avgOf = (rows: ReviewRow[]) => (rows.length ? rows.reduce((a, r) => a + r.rating, 0) / rows.length : 0);
+  const avg = avgOf(cur), prevAvg = avgOf(prev);
+  const five = cur.filter((r) => r.rating === 5).length;
+  const low = cur.filter((r) => r.rating <= 2).length;
+  return [
+    { label: "Average Rating", value: cur.length ? `${avg.toFixed(2)}<small> / 5</small>` : "—", deltaPct: prevAvg ? deltaPct(avg, prevAvg) : null, sub: windowLabel(f) },
+    { label: "Reviews", value: num(cur.length), deltaPct: prev.length ? deltaPct(cur.length, prev.length) : null, sub: windowLabel(f) },
+    { label: "5★ Share", value: cur.length ? pct((five / cur.length) * 100) : "—", sub: `${num(five)} five-star reviews` },
+    { label: "Low Ratings", value: `<span style="color:var(--color-crimson-bright)">${num(low)}</span>`, sub: "1–2★ · needs attention" },
+  ];
+}
+
+export function getRatingDistribution(f: Filter): RatingBucket[] {
+  const cur = windowReviews(f);
+  return [5, 4, 3, 2, 1].map((rating) => ({ rating, count: cur.filter((r) => r.rating === rating).length }));
+}
+
+export function getSkuReviewAggs(f: Filter): SkuReviewAgg[] {
+  const by = new Map<string, SkuReviewAgg & { total: number }>();
+  windowReviews(f).forEach((r) => {
+    const a = by.get(r.sku) || { sku: r.sku, name: r.name, reviews: 0, avg: 0, five: 0, low: 0, total: 0 };
+    a.reviews += 1;
+    a.total += r.rating;
+    if (r.rating === 5) a.five += 1;
+    if (r.rating <= 2) a.low += 1;
+    by.set(r.sku, a);
+  });
+  return [...by.values()]
+    .map(({ total, ...a }) => ({ ...a, avg: a.reviews ? total / a.reviews : 0 }))
+    .sort((a, b) => b.reviews - a.reviews);
+}
+
+export function reviewAlertCount(): number {
+  return getReviews({ channel: "all", days: 30 }).filter((r) => r.rating <= 2).length;
 }
 
 /* ---------- stable per-string rng for returns ---------- */

@@ -9,6 +9,7 @@ import {
   Target,
   RotateCw,
   Layers,
+  Star,
   Sparkles,
   Menu,
   CalendarRange,
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/inventory", label: "Inventory", icon: Package, group: "Command", badgeKey: "inventory" },
   { href: "/advertising", label: "Advertising", icon: Target, group: "Command", badgeKey: "advertising" },
   { href: "/returns", label: "Returns", icon: RotateCw, group: "Command" },
+  { href: "/reviews", label: "Reviews", icon: Star, group: "Command", badgeKey: "reviews" },
   { href: "/products", label: "Products", icon: Layers, group: "Command" },
   { href: "/insights", label: "Claude Insights", icon: Sparkles, group: "Intelligence", badgeKey: "insights" },
 ] as const;
@@ -35,6 +37,7 @@ const TITLES: Record<string, { t: string; s: string }> = {
   "/inventory": { t: "Inventory", s: "Stock health & stockout forecasting" },
   "/advertising": { t: "Advertising", s: "Amazon campaign performance & wasted spend" },
   "/returns": { t: "Returns", s: "Return-rate outliers & reasons" },
+  "/reviews": { t: "Reviews", s: "Customer ratings & sentiment across channels" },
   "/products": { t: "Products", s: "Cross-channel SKU master" },
   "/insights": { t: "Claude Insights", s: "Ask plain-English questions over live data" },
   "/drilldown/revenue": { t: "Net Revenue — Detail", s: "Every rupee by product, channel, price & units" },

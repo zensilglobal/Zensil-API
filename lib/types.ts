@@ -121,6 +121,35 @@ export interface ReturnLineRow {
   reason: string;
 }
 
+/** One customer review (imported or synced). */
+export interface ReviewRow {
+  id: string;
+  channel: Channel;
+  date: string; // ISO date
+  sku: string;
+  name: string;
+  rating: number; // 1..5
+  title: string;
+  body: string;
+  author: string;
+  verified: boolean;
+}
+
+/** Per-SKU review aggregate for the window. */
+export interface SkuReviewAgg {
+  sku: string;
+  name: string;
+  reviews: number;
+  avg: number;
+  five: number; // 5★ count
+  low: number; // 1–2★ count
+}
+
+export interface RatingBucket {
+  rating: number; // 1..5
+  count: number;
+}
+
 export interface TopProduct {
   sku: string;
   name: string;

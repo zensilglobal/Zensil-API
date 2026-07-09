@@ -15,9 +15,9 @@ import type { Channel } from "@/lib/types";
   the same component serves revenue, orders, AOV and ACOS drill-downs.
 */
 
-export type CellKind = "text" | "money" | "int" | "float" | "pct" | "channel" | "status" | "date";
+export type CellKind = "text" | "money" | "int" | "float" | "pct" | "channel" | "status" | "date" | "rating";
 
-const NUMERIC: CellKind[] = ["money", "int", "float", "pct"];
+const NUMERIC: CellKind[] = ["money", "int", "float", "pct", "rating"];
 
 export interface DrillCol {
   key: string;
@@ -42,14 +42,25 @@ function fmt(v: string | number, kind: CellKind): string {
     case "int": return num(Number(v));
     case "float": return Number(v).toFixed(1);
     case "pct": return Number(v).toFixed(1) + "%";
+    case "rating": return Number(v).toFixed(Number.isInteger(Number(v)) ? 0 : 1) + "★";
     case "date": return dayLabel(String(v));
     case "channel": return channelName(String(v));
     default: return String(v);
   }
 }
 
+function Stars({ value }: { value: number }) {
+  const full = Math.round(value);
+  return (
+    <span className="stars" title={`${value.toFixed(1)} of 5`} aria-label={`${value.toFixed(1)} of 5 stars`}>
+      {"★".repeat(full)}
+      <span className="stars-off">{"★".repeat(5 - full)}</span>
+    </span>
+  );
+}
+
 function csvValue(v: string | number, kind: CellKind): string | number {
-  if (kind === "money" || kind === "pct" || kind === "float") return Math.round(Number(v) * 100) / 100;
+  if (kind === "money" || kind === "pct" || kind === "float" || kind === "rating") return Math.round(Number(v) * 100) / 100;
   if (kind === "int") return Number(v);
   if (kind === "date") return String(v).slice(0, 10);
   if (kind === "channel") return channelName(String(v));
@@ -231,6 +242,12 @@ export default function DrilldownTable({
                     return (
                       <td key={c.key}>
                         <StatusPill status={String(r[c.key])} />
+                      </td>
+                    );
+                  if (kind === "rating")
+                    return (
+                      <td key={c.key} className="right">
+                        <Stars value={Number(r[c.key])} />
                       </td>
                     );
                   const numeric = NUMERIC.includes(kind);

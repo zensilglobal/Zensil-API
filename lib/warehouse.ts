@@ -14,6 +14,9 @@ import {
   ReturnRow,
   ReturnLineRow,
   ReturnReason,
+  ReviewRow,
+  SkuReviewAgg,
+  RatingBucket,
   TopProduct,
   ProductRow,
   Decision,
@@ -442,6 +445,101 @@ export async function returnReasons(f: Filter): Promise<ReturnReason[]> {
   );
   const total = rows.reduce((a, r) => a + +r.n, 0) || 1;
   return rows.map((r, i) => ({ reason: r.reason, share: Math.round((+r.n / total) * 100), color: REASON_COLORS[i % REASON_COLORS.length] }));
+}
+
+/* ---------------- customer reviews ---------------- */
+
+export async function reviews(f: Filter, limit = 2000): Promise<ReviewRow[]> {
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
+  const rows = await q<{ id: string; channel: Channel; date: string; sku: string | null; name: string | null; rating: string; title: string | null; body: string | null; author: string | null; verified: boolean | null }>(
+    `SELECT r.review_id id, r.channel, r.review_date date, r.internal_sku sku,
+       coalesce(sm.product_name, r.internal_sku, '—') name, r.rating, r.title, r.body, r.author, r.verified
+     FROM reviews r LEFT JOIN sku_master sm ON sm.internal_sku = r.internal_sku
+     WHERE r.review_date >= $1::date AND r.review_date < $2::date ${clause.replace("channel", "r.channel")}
+     ORDER BY r.review_date DESC LIMIT ${Number(limit)}`,
+    [w.start, w.endEx, ...params],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    channel: r.channel,
+    date: new Date(r.date).toISOString().slice(0, 10),
+    sku: r.sku || "",
+    name: r.name || "—",
+    rating: +r.rating,
+    title: r.title || "",
+    body: r.body || "",
+    author: r.author || "",
+    verified: !!r.verified,
+  }));
+}
+
+export async function reviewKpis(f: Filter): Promise<Kpi[]> {
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 4);
+  const row = await q1<{ n: string; avg: string; five: string; low: string; prev_n: string; prev_avg: string }>(
+    `SELECT
+       count(*) filter (where review_date >= $2::date) n,
+       coalesce(avg(rating) filter (where review_date >= $2::date), 0) avg,
+       count(*) filter (where review_date >= $2::date and rating = 5) five,
+       count(*) filter (where review_date >= $2::date and rating <= 2) low,
+       count(*) filter (where review_date < $2::date) prev_n,
+       coalesce(avg(rating) filter (where review_date < $2::date), 0) prev_avg
+     FROM reviews WHERE review_date >= $1::date AND review_date < $3::date ${clause}`,
+    [w.prevStart, w.start, w.endEx, ...params],
+  );
+  const n = +row.n, avg = +row.avg, five = +row.five, low = +row.low;
+  const prevN = +row.prev_n, prevAvg = +row.prev_avg;
+  return [
+    { label: "Average Rating", value: n ? `${avg.toFixed(2)}<small> / 5</small>` : "—", deltaPct: prevAvg ? deltaPct(avg, prevAvg) : null, sub: windowLabel(f) },
+    { label: "Reviews", value: num(n), deltaPct: prevN ? deltaPct(n, prevN) : null, sub: windowLabel(f) },
+    { label: "5★ Share", value: n ? pct((five / n) * 100) : "—", sub: `${num(five)} five-star reviews` },
+    { label: "Low Ratings", value: `<span style="color:var(--color-crimson-bright)">${num(low)}</span>`, sub: "1–2★ · needs attention" },
+  ];
+}
+
+export async function ratingDistribution(f: Filter): Promise<RatingBucket[]> {
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
+  const rows = await q<{ rating: string; n: string }>(
+    `SELECT rating, count(*) n FROM reviews
+     WHERE review_date >= $1::date AND review_date < $2::date ${clause}
+     GROUP BY rating`,
+    [w.start, w.endEx, ...params],
+  );
+  const by = new Map(rows.map((r) => [+r.rating, +r.n]));
+  return [5, 4, 3, 2, 1].map((rating) => ({ rating, count: by.get(rating) || 0 }));
+}
+
+export async function skuReviewAggs(f: Filter): Promise<SkuReviewAgg[]> {
+  const w = windowOf(f);
+  const { clause, params } = ch(f, 3);
+  const rows = await q<{ sku: string | null; name: string | null; reviews: string; avg: string; five: string; low: string }>(
+    `SELECT r.internal_sku sku, coalesce(sm.product_name, r.internal_sku, '—') name,
+       count(*) reviews, avg(r.rating) avg,
+       count(*) filter (where r.rating = 5) five,
+       count(*) filter (where r.rating <= 2) low
+     FROM reviews r LEFT JOIN sku_master sm ON sm.internal_sku = r.internal_sku
+     WHERE r.review_date >= $1::date AND r.review_date < $2::date ${clause.replace("channel", "r.channel")}
+     GROUP BY r.internal_sku, coalesce(sm.product_name, r.internal_sku, '—')
+     ORDER BY count(*) DESC`,
+    [w.start, w.endEx, ...params],
+  );
+  return rows.map((r) => ({
+    sku: r.sku || "",
+    name: r.name || "—",
+    reviews: +r.reviews,
+    avg: +r.avg,
+    five: +r.five,
+    low: +r.low,
+  }));
+}
+
+export async function reviewAlertCount(): Promise<number> {
+  const row = await q1<{ n: string }>(
+    `SELECT count(*) n FROM reviews WHERE rating <= 2 AND review_date >= (now() - interval '30 days')::date`,
+  );
+  return +row.n;
 }
 
 export async function products(): Promise<ProductRow[]> {

@@ -37,6 +37,14 @@ export const getReturnsKpis = (f: Filter) => (live ? wh.returnsKpis(f) : Promise
 export const getReturnReasons = (f: Filter) => (live ? wh.returnReasons(f) : Promise.resolve(mock.getReturnReasons()));
 export const getReturnLines = (f: Filter) => (live ? wh.returnLines(f) : Promise.resolve(mock.getReturnLines(f)));
 
+export const getReviews = (f: Filter) => (live ? wh.reviews(f) : Promise.resolve(mock.getReviews(f)));
+export const getReviewKpis = (f: Filter) => (live ? wh.reviewKpis(f) : Promise.resolve(mock.getReviewKpis(f)));
+export const getRatingDistribution = (f: Filter) =>
+  live ? wh.ratingDistribution(f) : Promise.resolve(mock.getRatingDistribution(f));
+export const getSkuReviewAggs = (f: Filter) =>
+  live ? wh.skuReviewAggs(f) : Promise.resolve(mock.getSkuReviewAggs(f));
+export const reviewAlertCount = () => (live ? wh.reviewAlertCount() : Promise.resolve(mock.reviewAlertCount()));
+
 export const getProducts = () => (live ? wh.products() : Promise.resolve(mock.getProducts()));
 export const decisionCount = () => (live ? wh.decisionCount() : Promise.resolve(mock.decisionCount()));
 

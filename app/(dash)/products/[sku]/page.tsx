@@ -9,6 +9,7 @@ import {
   getStockHealth,
   getReturns,
   getReturnLines,
+  getReviews,
   getSkuTrend,
 } from "@/lib/queries";
 import { inr, inrK, num, pct } from "@/lib/format";
@@ -43,6 +44,15 @@ const RETURN_COLS: DrillCol[] = [
   { key: "reason", label: "Reason", filter: true },
 ];
 
+const REVIEW_COLS: DrillCol[] = [
+  { key: "date", label: "Date", kind: "date" },
+  { key: "channel", label: "Channel", kind: "channel", filter: true },
+  { key: "rating", label: "Rating", kind: "rating", filter: true },
+  { key: "title", label: "Title", strong: true },
+  { key: "body", label: "Review" },
+  { key: "author", label: "By" },
+];
+
 export default async function ProductDetailPage({
   params,
   searchParams,
@@ -54,13 +64,14 @@ export default async function ProductDetailPage({
   const sku = decodeURIComponent(rawSku);
   const f = parseFilter(await searchParams);
 
-  const [products, revAll, linesAll, stockAll, returnsAll, returnLinesAll, trend] = await Promise.all([
+  const [products, revAll, linesAll, stockAll, returnsAll, returnLinesAll, reviewsAll, trend] = await Promise.all([
     getProducts(),
     getRevenueBySku(f),
     getOrderLines(f),
     getStockHealth(f),
     getReturns(f),
     getReturnLines(f),
+    getReviews(f),
     getSkuTrend(f, sku),
   ]);
 
@@ -72,6 +83,8 @@ export default async function ProductDetailPage({
   const stock = stockAll.find((s) => s.sku === sku);
   const ret = returnsAll.find((r) => r.sku === sku);
   const retLines = returnLinesAll.filter((r) => r.sku === sku);
+  const skuReviews = reviewsAll.filter((r) => r.sku === sku);
+  const avgRating = skuReviews.length ? skuReviews.reduce((a, r) => a + r.rating, 0) / skuReviews.length : 0;
 
   const revenue = rev.reduce((a, r) => a + r.revenue, 0);
   const units = rev.reduce((a, r) => a + r.units, 0);
@@ -142,6 +155,13 @@ export default async function ProductDetailPage({
               <dt>Return Rate</dt>
               <dd>{ret ? pct(ret.rate) : "0%"} <small>{ret ? `top: ${ret.reason}` : "no returns in window"}</small></dd>
             </div>
+            <div>
+              <dt>Avg Rating</dt>
+              <dd>
+                {skuReviews.length ? avgRating.toFixed(1) + "★" : "—"}{" "}
+                <small>{skuReviews.length ? `${skuReviews.length} reviews` : "no reviews in window"}</small>
+              </dd>
+            </div>
           </dl>
         </Card>
       </div>
@@ -186,6 +206,28 @@ export default async function ProductDetailPage({
             filename={`zensil-${prod.sku}-orders`}
             initialSort={{ key: "date", dir: "desc" }}
           />
+        </Card>
+      </div>
+
+      <div className="mt">
+        <Card
+          title="Customer Reviews"
+          sub={
+            skuReviews.length
+              ? `${skuReviews.length} reviews in the window · average ${avgRating.toFixed(1)}★`
+              : "Reviews for this SKU in the window"
+          }
+        >
+          {skuReviews.length ? (
+            <DrilldownTable
+              rows={skuReviews as unknown as Record<string, string | number>[]}
+              cols={REVIEW_COLS}
+              filename={`zensil-${prod.sku}-reviews`}
+              initialSort={{ key: "date", dir: "desc" }}
+            />
+          ) : (
+            <div className="empty">No reviews in this window</div>
+          )}
         </Card>
       </div>
 
