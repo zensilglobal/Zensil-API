@@ -117,6 +117,12 @@ export default async function ReviewsPage({
             (optional: title, body, author, verified, review_id). Re-importing the same file is safe — duplicates are
             skipped.
           </p>
+          <p className="tiny muted" style={{ marginTop: 6 }}>
+            Why CSV? Amazon exposes no seller API for review text, and its Customer Feedback API (aggregated
+            insights only) does not cover the India marketplace — verified against SP-API. Export reviews from
+            Seller Central (Brand Registry → Manage Your Customer Reviews) or your Shopify review app and import
+            them here; scraping review pages violates marketplace terms and risks the seller account.
+          </p>
         </Card>
       </div>
     </>
