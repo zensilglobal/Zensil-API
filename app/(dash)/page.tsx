@@ -64,7 +64,7 @@ export default async function OverviewPage({
           className="span-2"
           action={
             <Link className="btn ghost" href="/insights">
-              <Sparkles size={15} /> Ask Claude why
+              <Sparkles size={15} /> Ask Gemini why
             </Link>
           }
         >

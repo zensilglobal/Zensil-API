@@ -1,5 +1,5 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import {
   getStockHealth,
   getCampaigns,
@@ -13,15 +13,16 @@ import { Filter } from "./types";
 
 /* =====================================================================
    INSIGHTS ENGINE
-   Shared grounding + Claude plumbing for the two Claude surfaces:
+   Shared grounding + Gemini plumbing for the two AI surfaces:
    the interactive /api/claude endpoint and the /api/digest weekly review.
    Both ground on the same warehouse snapshot and degrade gracefully.
    ===================================================================== */
 
-export const INSIGHTS_MODEL = "claude-opus-4-8";
+// gemini-2.5-flash: best model with free-tier quota (2.5-pro is paid-tier only)
+export const INSIGHTS_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-export function anthropicReady(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+export function geminiReady(): boolean {
+  return Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
 }
 
 export const ANALYST_SYSTEM = `You are the analyst inside Zensil Ops Console — the command centre for Zensil, an Indian premium D2C brand selling across Amazon, Flipkart and Shopify. You answer the operator's questions over their live warehouse.
@@ -121,29 +122,37 @@ export function sanitize(html: string): string {
     .trim();
 }
 
-function textOf(message: Anthropic.Message): string {
-  return sanitize(
-    message.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n")
-      .trim(),
-  );
+// Gemini sometimes wraps HTML output in ```html fences despite instructions.
+function unfence(s: string): string {
+  return s.replace(/^```(?:html)?\s*/i, "").replace(/```\s*$/, "").trim();
+}
+
+/** One grounded Gemini call. Throws on API error (callers fall back). */
+async function generate(system: string, prompt: string): Promise<{ text: string; model: string }> {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  // "AQ." keys are Vertex AI express-mode keys; "AIza" keys are AI Studio keys.
+  const ai = new GoogleGenAI({ apiKey, vertexai: apiKey?.startsWith("AQ.") });
+  const response = await ai.models.generateContent({
+    model: INSIGHTS_MODEL,
+    contents: prompt,
+    config: {
+      systemInstruction: system,
+      // Gemini 2.5 thinking tokens count against this cap — keep it roomy.
+      maxOutputTokens: 8192,
+      temperature: 0.3,
+    },
+  });
+  return { text: sanitize(unfence(response.text ?? "")), model: response.modelVersion ?? INSIGHTS_MODEL };
 }
 
 /** Interactive Q&A — grounded HTML fragment. Throws on API error (caller falls back). */
 export async function runInsight(question: string, f: Filter): Promise<{ html: string; model: string }> {
   const snapshot = await buildSnapshot(f);
-  const client = new Anthropic();
-  const message = await client.messages.create({
-    model: INSIGHTS_MODEL,
-    max_tokens: 4000,
-    thinking: { type: "adaptive" },
-    output_config: { effort: "medium" },
-    system: ANALYST_SYSTEM,
-    messages: [{ role: "user", content: `Question: ${question}\n\nWarehouse snapshot (JSON):\n${JSON.stringify(snapshot)}` }],
-  });
-  return { html: textOf(message), model: message.model };
+  const { text, model } = await generate(
+    ANALYST_SYSTEM,
+    `Question: ${question}\n\nWarehouse snapshot (JSON):\n${JSON.stringify(snapshot)}`,
+  );
+  return { html: text, model };
 }
 
 /* ----------------------------- WEEKLY DIGEST ----------------------------- */
@@ -176,24 +185,19 @@ function emailShell(bodyHtml: string): string {
 </div></body></html>`;
 }
 
-/** Claude-written weekly review. Throws on API error (caller falls back). */
+/** Gemini-written weekly review. Throws on API error (caller falls back). */
 export async function runDigest(f: Filter): Promise<{ subject: string; html: string; model: string }> {
   const snapshot = await buildSnapshot(f);
-  const client = new Anthropic();
-  const message = await client.messages.create({
-    model: INSIGHTS_MODEL,
-    max_tokens: 4000,
-    thinking: { type: "adaptive" },
-    output_config: { effort: "medium" },
-    system: DIGEST_SYSTEM,
-    messages: [{ role: "user", content: `Produce this week's review. Warehouse snapshot (JSON):\n${JSON.stringify(snapshot)}` }],
-  });
-  return { subject: digestSubject(), html: emailShell(textOf(message)), model: message.model };
+  const { text, model } = await generate(
+    DIGEST_SYSTEM,
+    `Produce this week's review. Warehouse snapshot (JSON):\n${JSON.stringify(snapshot)}`,
+  );
+  return { subject: digestSubject(), html: emailShell(text), model };
 }
 
 const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 
-/** Deterministic digest from the snapshot — used when no ANTHROPIC_API_KEY is set. */
+/** Deterministic digest from the snapshot — used when no GEMINI_API_KEY is set. */
 export async function buildFallbackDigest(f: Filter): Promise<{ subject: string; html: string; model: string }> {
   const s: Snapshot = await buildSnapshot(f);
   const critical = s.stock_health.filter((r) => r.status === "critical");

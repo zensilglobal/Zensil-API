@@ -101,10 +101,10 @@ const SKILLS = [
 
 function modelLabel(model?: string): string {
   if (!model || model === "sample") return "Sample data";
-  if (model.startsWith("claude-opus-4-8")) return "Opus 4.8";
-  if (model.startsWith("claude-opus")) return "Opus";
-  if (model.startsWith("claude-sonnet")) return "Sonnet";
-  return "Claude";
+  if (model.startsWith("gemini-2.5-pro")) return "Gemini 2.5 Pro";
+  if (model.startsWith("gemini-2.5-flash")) return "Gemini 2.5 Flash";
+  if (model.startsWith("gemini")) return "Gemini";
+  return "Gemini";
 }
 
 export default function Insights() {
@@ -147,7 +147,7 @@ export default function Insights() {
     }
   }
 
-  // auto-ask when arriving from an "Ask Claude" deep link (?q=...)
+  // auto-ask when arriving from an "Ask Gemini" deep link (?q=...)
   useEffect(() => {
     const q = searchParams.get("q");
     if (q && askedRef.current !== q) {
@@ -170,7 +170,7 @@ export default function Insights() {
             <Sparkles size={16} />
           </div>
           <div>
-            <div className="ask-title">Ask Claude anything about your business</div>
+            <div className="ask-title">Ask Gemini anything about your business</div>
             <div className="ask-meta">
               <span>
                 <ShieldCheck size={12} /> Read-only
@@ -179,7 +179,7 @@ export default function Insights() {
                 <Database size={12} /> Grounded on your live warehouse
               </span>
               <span className="ask-model">
-                <Sparkles size={11} /> Opus 4.8
+                <Sparkles size={11} /> Gemini 2.5 Flash
               </span>
             </div>
           </div>
@@ -217,7 +217,7 @@ export default function Insights() {
         <>
           <div className="skills-head">
             <h3>Analyst Skills</h3>
-            <p>One-click workflows — each runs a full analysis on your live data, run by Claude</p>
+            <p>One-click workflows — each runs a full analysis on your live data, run by Gemini</p>
           </div>
           <div className="skill-grid">
             {SKILLS.map((s) => {
@@ -266,7 +266,7 @@ export default function Insights() {
                 <span className="who-crest">
                   <Sparkles size={12} />
                 </span>
-                Claude · Zensil Ops
+                Gemini · Zensil Ops
                 <span className={`who-model ${m.model === "sample" ? "sample" : ""}`}>{modelLabel(m.model)}</span>
               </div>
               {m.loading ? (

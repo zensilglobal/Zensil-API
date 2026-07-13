@@ -45,5 +45,5 @@ services:
         generateValue: true # Render generates a long random secret
       - key: DATABASE_URL
         sync: false # Neon pooled connection string
-      - key: ANTHROPIC_API_KEY
+      - key: GEMINI_API_KEY
         sync: false # optional — leave blank until /api/claude goes live

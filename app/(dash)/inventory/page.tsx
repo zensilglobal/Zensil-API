@@ -37,7 +37,7 @@ export default async function InventoryPage({
                 className="btn gold"
                 href={askHref("Plan a restock for all SKUs with fewer than 14 days of cover before the next sale event", f)}
               >
-                <Sparkles size={15} /> Ask Claude to plan a restock
+                <Sparkles size={15} /> Ask Gemini to plan a restock
               </Link>
             </div>
           }

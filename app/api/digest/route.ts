@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { Filter } from "@/lib/types";
-import { anthropicReady, runDigest, buildFallbackDigest } from "@/lib/insights";
+import { geminiReady, runDigest, buildFallbackDigest } from "@/lib/insights";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const digest = anthropicReady() ? await runDigest(WINDOW) : await buildFallbackDigest(WINDOW);
+    const digest = geminiReady() ? await runDigest(WINDOW) : await buildFallbackDigest(WINDOW);
     return Response.json({ ...digest, text: toText(digest.html), generatedAt: new Date().toISOString() });
   } catch (err) {
     console.error("Digest error:", err);

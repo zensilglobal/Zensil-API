@@ -40,7 +40,7 @@ export function DecisionCard({ d, filter }: { d: Decision; filter: Filter }) {
         <p>{d.body}</p>
         <div className="act">
           <Link className="btn ghost" href={askHref(d.ask, filter)}>
-            <Sparkles size={15} /> Ask Claude
+            <Sparkles size={15} /> Ask Gemini
           </Link>
         </div>
       </div>

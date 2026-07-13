@@ -28,7 +28,7 @@ const NAV = [
   { href: "/returns", label: "Returns", icon: RotateCw, group: "Command" },
   { href: "/reviews", label: "Reviews", icon: Star, group: "Command", badgeKey: "reviews" },
   { href: "/products", label: "Products", icon: Layers, group: "Command" },
-  { href: "/insights", label: "Claude Insights", icon: Sparkles, group: "Intelligence", badgeKey: "insights" },
+  { href: "/insights", label: "Gemini Insights", icon: Sparkles, group: "Intelligence", badgeKey: "insights" },
 ] as const;
 
 const TITLES: Record<string, { t: string; s: string }> = {
@@ -39,7 +39,7 @@ const TITLES: Record<string, { t: string; s: string }> = {
   "/returns": { t: "Returns", s: "Return-rate outliers & reasons" },
   "/reviews": { t: "Reviews", s: "Customer ratings & sentiment across channels" },
   "/products": { t: "Products", s: "Cross-channel SKU master" },
-  "/insights": { t: "Claude Insights", s: "Ask plain-English questions over live data" },
+  "/insights": { t: "Gemini Insights", s: "Ask plain-English questions over live data" },
   "/drilldown/revenue": { t: "Net Revenue — Detail", s: "Every rupee by product, channel, price & units" },
   "/drilldown/orders": { t: "Orders — Detail", s: "Every order line in the window, SKU-wise" },
   "/drilldown/aov": { t: "Avg Order Value — Detail", s: "The per-order values behind the average" },

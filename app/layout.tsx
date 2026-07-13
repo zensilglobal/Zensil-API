@@ -21,7 +21,7 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Zēnsil Ops — Soul Of Your Kitchen",
   description:
-    "Unified operations console across Amazon, Flipkart and Shopify — KPIs, inventory, advertising, returns and Claude-powered decisions.",
+    "Unified operations console across Amazon, Flipkart and Shopify — KPIs, inventory, advertising, returns and AI-powered decisions.",
 };
 
 // applied before first paint so the saved theme never flashes

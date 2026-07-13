@@ -33,7 +33,7 @@ DATABASE_URL=postgresql://...        # the same Neon pooled connection string
 APP_AUTH_EMAIL=office@zensil.in      # dashboard login
 APP_AUTH_PASSWORD=<strong password>
 APP_AUTH_SECRET=<long random string> # signs the session cookie
-ANTHROPIC_API_KEY=                   # optional — real Claude answers in /insights
+GEMINI_API_KEY=                      # optional — real Gemini answers in /insights
 ```
 With `DATABASE_URL` set, `lib/queries.ts` switches every screen from sample data
 to live Neon queries; `proxy.ts` enforces the cookie login on all pages.
@@ -88,7 +88,7 @@ The ETL is unaffected — it keeps running on the GitHub Actions schedule.
 Point a Postgres MCP server at the `zensil_readonly` role and add it as a custom
 connector in a "Zensil Ops" Claude Project whose instructions hold the schema,
 unit economics, and decision thresholds (PRD §11). The dashboard's `/api/claude`
-route can also be upgraded to call the Claude API directly once `ANTHROPIC_API_KEY` is set.
+route calls the Google Gemini API directly once `GEMINI_API_KEY` is set.
 
 ## Business inputs needed before go-live
 Per-SKU **cost price + target margin** (→ `sku_master`), target **ACOS**, and

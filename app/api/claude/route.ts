@@ -1,15 +1,15 @@
 import { NextRequest } from "next/server";
 import { claudeAnswer } from "@/lib/data";
 import { ChannelFilter, Filter } from "@/lib/types";
-import { anthropicReady, runInsight } from "@/lib/insights";
+import { geminiReady, runInsight } from "@/lib/insights";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Claude Insights endpoint — "Run by Claude".
+ * AI Insights endpoint.
  *
- * With ANTHROPIC_API_KEY set, the question is answered by Claude Opus 4.8,
+ * With GEMINI_API_KEY set, the question is answered by Google Gemini,
  * grounded on a live snapshot of the warehouse for the selected channel +
  * window (see lib/insights.ts). Without a key — or on any API error — it
  * degrades to the built-in sample analyst so the feature always runs.
@@ -44,14 +44,14 @@ export async function POST(request: NextRequest) {
 
   const sample = () => Response.json({ answer: claudeAnswer(question), grounded: true, model: "sample" });
 
-  if (!anthropicReady()) return sample();
+  if (!geminiReady()) return sample();
 
   try {
     const { html, model } = await runInsight(question, filter);
     if (!html) return sample();
     return Response.json({ answer: html, grounded: true, model });
   } catch (err) {
-    console.error("Claude Insights error:", err);
+    console.error("AI Insights error:", err);
     return sample();
   }
 }

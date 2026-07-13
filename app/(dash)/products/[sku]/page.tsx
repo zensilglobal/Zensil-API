@@ -122,7 +122,7 @@ export default async function ProductDetailPage({
           className="btn gold"
           href={askHref(`Give me a full performance review of ${prod.sku} (${prod.name}) — sales, stock, returns and what to do next.`, f)}
         >
-          <Sparkles size={15} /> Ask Claude about this SKU
+          <Sparkles size={15} /> Ask Gemini about this SKU
         </Link>
       </div>
 
