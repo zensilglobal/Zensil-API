@@ -2,6 +2,19 @@ import { Suspense } from "react";
 import AppFrame from "@/components/AppFrame";
 import { getStockHealth, getCampaigns, decisionCount, getSyncStatus, reviewAlertCount } from "@/lib/queries";
 
+/*
+  Every dashboard route reads the warehouse, so none of them may be
+  prerendered. Set here rather than per page: segment config inherits, so
+  this covers the sidebar badges below plus every page under (dash).
+
+  Without it `next build` renders these routes at build time, which breaks
+  two ways: the Docker build has no DATABASE_URL, so pages ship with the
+  sample-data fallback baked into static HTML and never show real numbers;
+  and any build that *does* see DATABASE_URL fails outright when the
+  warehouse is unreachable.
+*/
+export const dynamic = "force-dynamic";
+
 export default async function DashLayout({ children }: { children: React.ReactNode }) {
   const [stock, campaigns, decisions, sync, lowReviews] = await Promise.all([
     getStockHealth({ channel: "all", days: 30 }),

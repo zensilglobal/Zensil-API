@@ -201,7 +201,6 @@ const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 export async function buildFallbackDigest(f: Filter): Promise<{ subject: string; html: string; model: string }> {
   const s: Snapshot = await buildSnapshot(f);
   const critical = s.stock_health.filter((r) => r.status === "critical");
-  const low = s.stock_health.filter((r) => r.status === "low");
   const wasted = typeof s.advertising === "object" ? s.advertising.wasted_spend.filter((w) => w.orders === 0) : [];
   const wastedTotal = wasted.reduce((a, w) => a + w.spend, 0);
   const worstReturn = s.returns[0];
