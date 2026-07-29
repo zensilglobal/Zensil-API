@@ -15,13 +15,29 @@ import { getStockHealth, getCampaigns, decisionCount, getSyncStatus, reviewAlert
 */
 export const dynamic = "force-dynamic";
 
+/*
+  The badges are decorative, and error.tsx does not wrap the layout in its
+  own segment — a throw here escapes to the root instead, blanking the
+  whole app. So each count degrades to "no badge" on its own: when the
+  warehouse is unreachable the nav still renders and the page below can
+  show a proper error.
+*/
+async function count<T>(load: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await load();
+  } catch {
+    return fallback;
+  }
+}
+
 export default async function DashLayout({ children }: { children: React.ReactNode }) {
   const [stock, campaigns, decisions, sync, lowReviews] = await Promise.all([
-    getStockHealth({ channel: "all", days: 30 }),
-    getCampaigns(),
-    decisionCount(),
-    getSyncStatus(),
-    reviewAlertCount(),
+    count(() => getStockHealth({ channel: "all", days: 30 }), []),
+    count(() => getCampaigns(), []),
+    count(() => decisionCount(), 0),
+    // null renders the "Sample data" pill rather than claiming a fresh sync
+    count(() => getSyncStatus(), null),
+    count(() => reviewAlertCount(), 0),
   ]);
   const badges = {
     inventory: stock.filter((r) => r.status === "critical").length,
