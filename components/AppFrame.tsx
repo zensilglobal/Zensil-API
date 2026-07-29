@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import {
@@ -75,13 +75,22 @@ export default function AppFrame({
   const searchParams = useSearchParams();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  // isPending stays true for the whole round trip, so the icon spins until
+  // the refreshed server data has actually landed
+  const [refreshing, startRefresh] = useTransition();
 
-  // Live dashboard: re-fetch all server data every 60s (only while the tab
-  // is visible) so new orders appear without a manual reload.
+  /*
+    Re-fetch server data on a timer, but slowly. Every dashboard route is
+    rendered per request, so each refresh is a full round of warehouse
+    queries; at the old 60s cadence a single open tab kept Neon's compute
+    from ever auto-suspending and exhausted its monthly quota, taking the
+    warehouse down. Ten minutes lets the compute sleep between visits —
+    use the refresh button when you need the numbers right now.
+  */
   useEffect(() => {
     const id = setInterval(() => {
       if (document.visibilityState === "visible") router.refresh();
-    }, 60_000);
+    }, 10 * 60_000);
     return () => clearInterval(id);
   }, [router]);
 
@@ -289,6 +298,18 @@ export default function AppFrame({
               </div>
             )}
           </div>
+          <button
+            type="button"
+            className="theme-btn"
+            onClick={() => startRefresh(() => router.refresh())}
+            disabled={refreshing}
+            aria-label="Refresh data now"
+            title="Refresh data now"
+          >
+            <span className={`refresh-ic ${refreshing ? "busy" : ""}`}>
+              <RotateCw size={16} />
+            </span>
+          </button>
           <ThemeToggle />
         </header>
         <div className="content page-rise" key={pathname + searchParams.toString()}>
