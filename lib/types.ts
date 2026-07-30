@@ -196,3 +196,13 @@ export interface SyncStatus {
   label: string; // e.g. "2h ago"
   ok: boolean; // false when stale (>6h) or a pipeline reported an error
 }
+
+/** One tile in the live strip — read straight from a marketplace API, not the warehouse. */
+export interface LiveTile {
+  key: string;
+  label: string;
+  source: "amazon" | "shopify";
+  value: string; // preformatted, e.g. "₹12.4K"
+  sub: string; // secondary line, or the failure reason when error is set
+  error?: boolean;
+}

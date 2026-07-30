@@ -15,6 +15,15 @@ envVarGroups:
         sync: false
       - key: SPAPI_REFRESH_TOKEN
         sync: false
+      # Shopify Admin API — used by the shopify_* pipelines and, at request
+      # time, by the overview live strip (lib/live.ts). Without these the
+      # strip simply hides its Shopify tiles.
+      - key: SHOPIFY_STORE_DOMAIN
+        sync: false
+      - key: SHOPIFY_ACCESS_TOKEN
+        sync: false # custom-app Admin API token, starts with shpat_
+      - key: SHOPIFY_API_VERSION
+        value: "2025-01"
       - key: ALERT_WEBHOOK_URL
         sync: false # optional — Slack/Discord webhook for pipeline failures
 

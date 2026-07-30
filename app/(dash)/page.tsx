@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { Sparkles } from "lucide-react";
 import { parseFilter, buildQuery } from "@/lib/filter";
+import { liveEnabled } from "@/lib/live";
+import LiveStrip, { LiveStripSkeleton } from "@/components/LiveStrip";
 import {
   getOverviewKpis,
   getTrend,
@@ -12,20 +15,66 @@ import { inr, inrK, num } from "@/lib/format";
 import { KpiGrid, Card } from "@/components/ui";
 import { RevenueTrend, ChannelDonut } from "@/components/charts";
 import { DecisionCard } from "@/components/DecisionCard";
+import WarehouseError from "@/components/WarehouseError";
+import { Filter } from "@/lib/types";
 
+/*
+  The only dashboard page that handles its own warehouse failure instead of
+  throwing to (dash)/error.tsx. The live strip reads the marketplace APIs
+  directly, so it stays correct while Neon is over quota or suspended —
+  throwing would replace the whole route with the error panel and take the
+  one still-working section down with it.
+*/
 export default async function OverviewPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const f = parseFilter(await searchParams);
-  const [kpis, trend, split, top, decisions] = await Promise.all([
-    getOverviewKpis(f),
-    getTrend(f),
-    getChannelSplit(f),
-    getTopProducts(f),
-    getDecisions(f),
-  ]);
+
+  return (
+    <>
+      {/* Checked here rather than inside LiveStrip so an unconfigured
+          install renders nothing at all, instead of flashing the skeleton
+          for a section that resolves to null. */}
+      {liveEnabled() && (
+        <Suspense fallback={<LiveStripSkeleton />}>
+          <LiveStrip />
+        </Suspense>
+      )}
+
+      {/* Own boundary so a slow warehouse does not hold back the strip. */}
+      <Suspense fallback={null}>
+        <Warehouse f={f} />
+      </Suspense>
+    </>
+  );
+}
+
+async function Warehouse({ f }: { f: Filter }) {
+  let data: [
+    Awaited<ReturnType<typeof getOverviewKpis>>,
+    Awaited<ReturnType<typeof getTrend>>,
+    Awaited<ReturnType<typeof getChannelSplit>>,
+    Awaited<ReturnType<typeof getTopProducts>>,
+    Awaited<ReturnType<typeof getDecisions>>,
+  ];
+  try {
+    data = await Promise.all([
+      getOverviewKpis(f),
+      getTrend(f),
+      getChannelSplit(f),
+      getTopProducts(f),
+      getDecisions(f),
+    ]);
+  } catch (err) {
+    // Logged server-side because React redacts the message before it reaches
+    // the panel; the panel re-derives the cause from /api/health.
+    console.error("overview warehouse read failed:", err);
+    return <WarehouseError />;
+  }
+
+  const [kpis, trend, split, top, decisions] = data;
   const max = top.length ? top[0].value : 1;
   const splitTotal = split.amazon + split.flipkart + split.shopify || 1;
   const legend = [
